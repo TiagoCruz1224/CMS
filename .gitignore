@@ -1,0 +1,170 @@
+# ====================================
+# CMS Project - Root .gitignore
+# ====================================
+
+# ====================================
+# Backend (Symfony)
+# ====================================
+
+###> symfony/framework-bundle ###
+backend/.env.local
+backend/.env.local.php
+backend/.env.*.local
+backend/config/secrets/prod/prod.decrypt.private.php
+backend/public/bundles/
+backend/var/
+backend/vendor/
+###< symfony/framework-bundle ###
+
+###> phpunit/phpunit ###
+backend/phpunit.xml
+backend/.phpunit.cache/
+###< phpunit/phpunit ###
+
+###> symfony/asset-mapper ###
+backend/public/assets/
+backend/assets/vendor/
+###< symfony/asset-mapper ###
+
+###> lexik/jwt-authentication-bundle ###
+backend/config/jwt/*.pem
+###< lexik/jwt-authentication-bundle ###
+
+# Composer
+backend/composer.lock
+
+# ====================================
+# Frontend (Vue 3 + Vite)
+# ====================================
+
+# Dependencies
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+
+# Logs
+frontend/*.log
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/lerna-debug.log*
+
+# Editor directories and files
+frontend/.vscode/*
+!frontend/.vscode/extensions.json
+frontend/.idea
+frontend/*.suo
+frontend/*.ntvs*
+frontend/*.njsproj
+frontend/*.sln
+frontend/*.sw?
+
+# Build outputs
+frontend/.vite/
+frontend/.cache/
+
+# ====================================
+# Database & Environment
+# ====================================
+
+# Environment files (keep .env.example)
+.env
+.env.local
+.env.*.local
+*.env
+
+# Database files
+*.sql
+*.sqlite
+*.db
+
+# ====================================
+# IDE & OS Files
+# ====================================
+
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ====================================
+# Logs & Runtime
+# ====================================
+
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# ====================================
+# Testing & Coverage
+# ====================================
+
+coverage/
+*.lcov
+.nyc_output/
+test-results/
+playwright-report/
+
+# ====================================
+# Temporary & Cache Files
+# ====================================
+
+*.tmp
+*.temp
+*.cache
+*.swp
+*.swo
+*~
+.sass-cache/
+.parcel-cache/
+
+# ====================================
+# Uploads & Media (Development)
+# ====================================
+
+# Uncomment if you don't want to commit uploaded media
+# backend/public/uploads/
+# frontend/public/uploads/
+
+# ====================================
+# Documentation (Internal Notes)
+# ====================================
+
+# Keep only README.md and SETUP.md for git
+FRONTEND_SUMMARY.md
+BACKEND_SUMMARY.md
+CREDENTIALS.md
+*_SUMMARY.md
