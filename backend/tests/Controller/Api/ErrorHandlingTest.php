@@ -66,6 +66,27 @@ class ErrorHandlingTest extends WebTestCase
         self::assertResponseStatusCodeSame(401);
     }
 
+    public function testChangingEmailToOneAlreadyInUseAnswers409(): void
+    {
+        $this->createUser('taken@example.com');
+        $user = $this->createUser('user@example.com');
+
+        $response = $this->send('PATCH', '/api/profile', $user, json_encode(['email' => 'taken@example.com', 'currentPassword' => self::PASSWORD]));
+
+        self::assertResponseStatusCodeSame(409);
+        self::assertStringNotContainsString('SQLSTATE', json_encode($response));
+        self::assertNotNull($this->reloadUser('user@example.com'));
+    }
+
+    public function testRegisteringAnEmailAlreadyInUseStillAnswers409(): void
+    {
+        $this->createUser('taken@example.com');
+
+        $this->send('POST', '/api/register', null, json_encode(['email' => 'taken@example.com', 'password' => self::PASSWORD]));
+
+        self::assertResponseStatusCodeSame(409);
+    }
+
     private function em(): EntityManagerInterface
     {
         return static::getContainer()->get(EntityManagerInterface::class);
@@ -92,6 +113,13 @@ class ErrorHandlingTest extends WebTestCase
         $this->em()->flush();
 
         return $user;
+    }
+
+    private function reloadUser(string $email): ?User
+    {
+        $this->em()->clear();
+
+        return $this->em()->getRepository(User::class)->findOneBy(['email' => $email]);
     }
 
     /**

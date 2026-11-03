@@ -4,6 +4,7 @@ namespace App\Controller\Api;
 
 use App\Entity\User;
 use App\Service\UserService;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -141,12 +142,17 @@ class AuthController extends AbstractController
     private function validationErrors(ValidationFailedException $e): JsonResponse
     {
         $errorMessages = [];
+        // A taken email is a conflict, as in register()
+        $status = Response::HTTP_BAD_REQUEST;
         foreach ($e->getViolations() as $violation) {
             $errorMessages[] = $violation->getMessage();
+            if ($violation->getCode() === UniqueEntity::NOT_UNIQUE_ERROR) {
+                $status = Response::HTTP_CONFLICT;
+            }
         }
 
         return $this->json([
             'errors' => $errorMessages
-        ], Response::HTTP_BAD_REQUEST);
+        ], $status);
     }
 }
