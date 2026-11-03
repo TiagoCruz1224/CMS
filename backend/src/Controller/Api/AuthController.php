@@ -73,10 +73,9 @@ class AuthController extends AbstractController
     #[Route('/profile', name: 'api_profile', methods: ['GET'])]
     public function profile(): JsonResponse
     {
-        /** @var User $user */
         $user = $this->getUser();
 
-        if (!$user) {
+        if (!$user instanceof User) {
             return $this->json([
                 'error' => 'Not authenticated'
             ], Response::HTTP_UNAUTHORIZED);
@@ -94,10 +93,9 @@ class AuthController extends AbstractController
     #[Route('/profile', name: 'api_profile_update', methods: ['PUT', 'PATCH'])]
     public function updateProfile(Request $request): JsonResponse
     {
-        /** @var User $user */
         $user = $this->getUser();
 
-        if (!$user) {
+        if (!$user instanceof User) {
             return $this->json([
                 'error' => 'Not authenticated'
             ], Response::HTTP_UNAUTHORIZED);
