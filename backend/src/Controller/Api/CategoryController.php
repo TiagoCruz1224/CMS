@@ -13,7 +13,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-#[Route('/api/categories')]
+#[Route('/api/categories', requirements: ['id' => '\d{1,18}'])]
 class CategoryController extends AbstractController
 {
     public function __construct(
@@ -67,40 +67,33 @@ class CategoryController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        try {
-            $category = new Category();
-            $category->setName($data['name']);
-            $category->setSlug($data['slug']);
+        $category = new Category();
+        $category->setName($data['name']);
+        $category->setSlug($data['slug']);
 
-            if (isset($data['description'])) {
-                $category->setDescription($data['description']);
-            }
-
-            $errors = $this->validator->validate($category);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-                }
-                return $this->json([
-                    'errors' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST);
-            }
-
-            $this->entityManager->persist($category);
-            $this->entityManager->flush();
-
-            $json = $this->serializer->serialize($category, 'json', [
-                'groups' => ['category:read']
-            ]);
-
-            return new JsonResponse($json, Response::HTTP_CREATED, [], true);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to create category: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        if (isset($data['description'])) {
+            $category->setDescription($data['description']);
         }
+
+        $errors = $this->validator->validate($category);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
+            }
+            return $this->json([
+                'errors' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $this->entityManager->persist($category);
+        $this->entityManager->flush();
+
+        $json = $this->serializer->serialize($category, 'json', [
+            'groups' => ['category:read']
+        ]);
+
+        return new JsonResponse($json, Response::HTTP_CREATED, [], true);
     }
 
     #[Route('/{id}', name: 'api_categories_update', methods: ['PUT', 'PATCH'])]
@@ -118,43 +111,36 @@ class CategoryController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        try {
-            if (isset($data['name'])) {
-                $category->setName($data['name']);
-            }
-
-            if (isset($data['slug'])) {
-                $category->setSlug($data['slug']);
-            }
-
-            if (isset($data['description'])) {
-                $category->setDescription($data['description']);
-            }
-
-            $errors = $this->validator->validate($category);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-                }
-                return $this->json([
-                    'errors' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST);
-            }
-
-            $this->entityManager->flush();
-
-            $json = $this->serializer->serialize($category, 'json', [
-                'groups' => ['category:read']
-            ]);
-
-            return new JsonResponse($json, Response::HTTP_OK, [], true);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to update category: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        if (isset($data['name'])) {
+            $category->setName($data['name']);
         }
+
+        if (isset($data['slug'])) {
+            $category->setSlug($data['slug']);
+        }
+
+        if (isset($data['description'])) {
+            $category->setDescription($data['description']);
+        }
+
+        $errors = $this->validator->validate($category);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
+            }
+            return $this->json([
+                'errors' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $this->entityManager->flush();
+
+        $json = $this->serializer->serialize($category, 'json', [
+            'groups' => ['category:read']
+        ]);
+
+        return new JsonResponse($json, Response::HTTP_OK, [], true);
     }
 
     #[Route('/{id}', name: 'api_categories_delete', methods: ['DELETE'])]
@@ -170,18 +156,11 @@ class CategoryController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        try {
-            $this->entityManager->remove($category);
-            $this->entityManager->flush();
+        $this->entityManager->remove($category);
+        $this->entityManager->flush();
 
-            return $this->json([
-                'message' => 'Category deleted successfully'
-            ], Response::HTTP_OK);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to delete category: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        return $this->json([
+            'message' => 'Category deleted successfully'
+        ], Response::HTTP_OK);
     }
 }

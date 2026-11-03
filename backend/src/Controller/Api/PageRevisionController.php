@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 
-#[Route('/api/pages')]
+#[Route('/api/pages', requirements: ['id' => '\d{1,18}', 'pageId' => '\d{1,18}', 'revisionId' => '\d{1,18}'])]
 class PageRevisionController extends AbstractController
 {
     public function __construct(
@@ -54,7 +54,7 @@ class PageRevisionController extends AbstractController
 
         $revision = $this->revisionRepository->find($revisionId);
 
-        if (!$revision || $revision->getPage()->getId() !== $pageId) {
+        if (!$revision || $revision->getPage()?->getId() !== $pageId) {
             return $this->json([
                 'error' => 'Revision not found'
             ], Response::HTTP_NOT_FOUND);

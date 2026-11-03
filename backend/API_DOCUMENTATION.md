@@ -47,6 +47,22 @@ REST API of the CMS, built with Symfony 6.4. It provides:
 
 ## API Endpoints
 
+### Errors
+
+Every error under `/api` answers JSON with an `error` message, or an `errors` list for validation failures.
+The one exception is the JWT layer: a missing, invalid or expired token answers
+`401 {"code": 401, "message": "..."}` (LexikJWTAuthenticationBundle's format).
+
+- `400` - the body of a `POST`, `PUT` or `PATCH` request is not a JSON object, a field has the wrong type
+  (`{"error": "Field \"title\" must be a string"}`), `page`/`limit` are not integers, a `categoryId` does not exist,
+  or the data fails validation (`{"errors": {...}}`)
+- `401` - missing or invalid JWT (format above); `403` - not allowed (`{"error": "Forbidden"}` or a specific message)
+- `404` - not found, not visible to the caller, a malformed id (ids are 1 to 18 digits) or an unknown route
+- `405` - method not allowed for the route (`Allow` header lists the valid ones)
+- `409` - the email is already used by another account (registration or profile update)
+- `500` - unexpected server error; the body is always `{"error": "Internal server error"}` and the details are only logged
+
+`GET /api/pages` clamps paging to `page >= 1` and `1 <= limit <= 100`.
 ### Authentication
 
 #### Register

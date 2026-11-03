@@ -4,6 +4,7 @@ namespace App\Controller\Api;
 
 use App\Entity\User;
 use App\Service\UserService;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -58,10 +59,6 @@ class AuthController extends AbstractController
 
         } catch (ValidationFailedException $e) {
             return $this->validationErrors($e);
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Registration failed: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -76,10 +73,9 @@ class AuthController extends AbstractController
     #[Route('/profile', name: 'api_profile', methods: ['GET'])]
     public function profile(): JsonResponse
     {
-        /** @var User $user */
         $user = $this->getUser();
 
-        if (!$user) {
+        if (!$user instanceof User) {
             return $this->json([
                 'error' => 'Not authenticated'
             ], Response::HTTP_UNAUTHORIZED);
@@ -97,10 +93,9 @@ class AuthController extends AbstractController
     #[Route('/profile', name: 'api_profile_update', methods: ['PUT', 'PATCH'])]
     public function updateProfile(Request $request): JsonResponse
     {
-        /** @var User $user */
         $user = $this->getUser();
 
-        if (!$user) {
+        if (!$user instanceof User) {
             return $this->json([
                 'error' => 'Not authenticated'
             ], Response::HTTP_UNAUTHORIZED);
@@ -131,22 +126,23 @@ class AuthController extends AbstractController
 
         } catch (ValidationFailedException $e) {
             return $this->validationErrors($e);
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Update failed: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     private function validationErrors(ValidationFailedException $e): JsonResponse
     {
         $errorMessages = [];
+        // A taken email is a conflict, as in register()
+        $status = Response::HTTP_BAD_REQUEST;
         foreach ($e->getViolations() as $violation) {
             $errorMessages[] = $violation->getMessage();
+            if ($violation->getCode() === UniqueEntity::NOT_UNIQUE_ERROR) {
+                $status = Response::HTTP_CONFLICT;
+            }
         }
 
         return $this->json([
             'errors' => $errorMessages
-        ], Response::HTTP_BAD_REQUEST);
+        ], $status);
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Controller\Api;
 
 use App\Entity\Block;
-use App\Entity\User;
 use App\Repository\BlockRepository;
 use App\Repository\PageRepository;
 use App\Security\Voter\PageVoter;
@@ -16,7 +15,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-#[Route('/api/blocks')]
+#[Route('/api/blocks', requirements: ['id' => '\d{1,18}'])]
 class BlockController extends AbstractController
 {
     public function __construct(
@@ -49,9 +48,6 @@ class BlockController extends AbstractController
     #[Route('', name: 'api_blocks_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $data = json_decode($request->getContent(), true);
 
         if (!isset($data['type']) || !isset($data['pageId'])) {
@@ -68,46 +64,35 @@ class BlockController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($page->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $page)) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
         }
 
-        try {
-            $block = $this->blockService->createBlock($data['type'], $page, $data);
+        $block = $this->blockService->createBlock($data['type'], $page, $data);
 
-            $errors = $this->validator->validate($block);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-                }
-                return $this->json([
-                    'errors' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST);
+        $errors = $this->validator->validate($block);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
             }
-
-            $json = $this->serializer->serialize($block, 'json', [
-                'groups' => ['block:read']
-            ]);
-
-            return new JsonResponse($json, Response::HTTP_CREATED, [], true);
-
-        } catch (\Exception $e) {
             return $this->json([
-                'error' => 'Failed to create block: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                'errors' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
         }
+
+        $json = $this->serializer->serialize($block, 'json', [
+            'groups' => ['block:read']
+        ]);
+
+        return new JsonResponse($json, Response::HTTP_CREATED, [], true);
     }
 
     #[Route('/{id}', name: 'api_blocks_update', methods: ['PUT', 'PATCH'])]
     public function update(int $id, Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $block = $this->blockRepository->find($id);
 
         if (!$block) {
@@ -116,8 +101,7 @@ class BlockController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($block->getPage()->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $block->getPage())) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
@@ -125,39 +109,29 @@ class BlockController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        try {
-            $this->blockService->updateBlock($block, $data);
+        $this->blockService->updateBlock($block, $data);
 
-            $errors = $this->validator->validate($block);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-                }
-                return $this->json([
-                    'errors' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST);
+        $errors = $this->validator->validate($block);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
             }
-
-            $json = $this->serializer->serialize($block, 'json', [
-                'groups' => ['block:read']
-            ]);
-
-            return new JsonResponse($json, Response::HTTP_OK, [], true);
-
-        } catch (\Exception $e) {
             return $this->json([
-                'error' => 'Failed to update block: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                'errors' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
         }
+
+        $json = $this->serializer->serialize($block, 'json', [
+            'groups' => ['block:read']
+        ]);
+
+        return new JsonResponse($json, Response::HTTP_OK, [], true);
     }
 
     #[Route('/{id}', name: 'api_blocks_delete', methods: ['DELETE'])]
     public function delete(int $id): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $block = $this->blockRepository->find($id);
 
         if (!$block) {
@@ -166,24 +140,16 @@ class BlockController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($block->getPage()->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $block->getPage())) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
         }
 
-        try {
-            $this->blockService->deleteBlock($block);
+        $this->blockService->deleteBlock($block);
 
-            return $this->json([
-                'message' => 'Block deleted successfully'
-            ], Response::HTTP_OK);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to delete block: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        return $this->json([
+            'message' => 'Block deleted successfully'
+        ], Response::HTTP_OK);
     }
 }

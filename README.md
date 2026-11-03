@@ -30,7 +30,8 @@ ordered content blocks, with drafts, scheduled publishing, SEO metadata and revi
 
 ### Prerequisites
 
-- PHP 8.2+ with the `sodium` and `pdo_mysql` extensions (plus `pdo_sqlite` for the tests)
+- PHP 8.2+ with the `sodium` and `pdo_mysql` extensions (plus `pdo_sqlite` for the tests). On Windows, `sodium` is
+  often disabled: uncomment `extension=sodium` in `php.ini`.
 - Composer
 - MySQL 8.0, or Docker to run the bundled `backend/compose.yaml`
 - Node.js 18+ and Yarn
@@ -49,7 +50,8 @@ php bin/console doctrine:migrations:migrate --no-interaction
 php -S localhost:8000 -t public/
 ```
 
-Copy `.env.example` before `composer install`, because its post-install scripts boot Symfony. Skip the
+Copy `.env.example` before `composer install`, because its post-install scripts boot Symfony. Then replace the
+example `APP_SECRET` and `JWT_PASSPHRASE` values in `.env` with your own, before generating the JWT keys. Skip the
 `docker compose` line if you use a local MySQL server, and set `DATABASE_URL` in `.env` instead.
 
 In a second terminal, from the repository root:
@@ -107,7 +109,7 @@ with `bin/console`, and exits with a non-zero status if any check fails.
 | Resource | Endpoints | Access |
 |---|---|---|
 | Auth | `POST /api/register`, `POST /api/login`, `GET` / `PUT /api/profile` | Public (register, login); authenticated (profile) |
-| Pages | `GET`, `POST /api/pages`; `GET`, `PUT`, `DELETE /api/pages/{id}`; `GET /api/pages/{id}/revisions` | Public read of published pages; revisions and writes need authentication |
+| Pages | `GET`, `POST /api/pages`; `GET`, `PUT`, `DELETE /api/pages/{id}`; `GET /api/pages/{id}/revisions`; `GET /api/pages/{id}/revisions/{revisionId}` | Public read of published pages; revisions and writes need authentication |
 | Blocks | `POST /api/blocks`; `GET`, `PUT`, `DELETE /api/blocks/{id}` | Authenticated |
 | Media | `GET`, `POST /api/media`; `GET`, `PUT`, `DELETE /api/media/{id}` | Authenticated |
 | Categories | `GET`, `POST /api/categories`; `GET`, `PUT`, `DELETE /api/categories/{id}` | Public read; admin write |
@@ -128,6 +130,8 @@ Full reference, including `?status=published`: [API documentation](backend/API_D
 - Media upload does not work end to end yet: the API stores media metadata (URL, type, alt text) but does not accept
   file uploads.
 - Categories and page revisions are available through the API only; the dashboard has no screens for them.
+- The Blocks screen cannot list blocks: the API has no `GET /api/blocks` endpoint (blocks are read one at a time or with
+  their page). Restoring a page revision is not supported either.
 - Dark mode covers the layout and login screen only.
 - No frontend tests yet.
 - Not deployed; there is no production configuration.

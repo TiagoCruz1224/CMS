@@ -37,7 +37,7 @@ class PermissionsTest extends WebTestCase
         $this->request('POST', '/api/register', body: ['email' => 'eve@example.com', 'password' => self::PASSWORD, 'roles' => ['ROLE_ADMIN']]);
 
         self::assertResponseStatusCodeSame(201);
-        self::assertSame(['ROLE_USER'], $this->reloadUser('eve@example.com')->getRoles());
+        self::assertSame(['ROLE_USER'], $this->reloadUser('eve@example.com')?->getRoles());
     }
 
     public function testRegisterWithNameIgnoresRequestedRoles(): void
@@ -46,6 +46,7 @@ class PermissionsTest extends WebTestCase
 
         self::assertResponseStatusCodeSame(201);
         $user = $this->reloadUser('eve@example.com');
+        self::assertNotNull($user);
         self::assertSame(['ROLE_USER'], $user->getRoles());
         self::assertSame('Eve', $user->getFirstName());
     }
@@ -57,7 +58,7 @@ class PermissionsTest extends WebTestCase
         $this->request('PATCH', '/api/profile', $user, ['firstName' => 'User', 'roles' => ['ROLE_ADMIN']]);
 
         self::assertResponseIsSuccessful();
-        self::assertSame(['ROLE_USER'], $this->reloadUser('user@example.com')->getRoles());
+        self::assertSame(['ROLE_USER'], $this->reloadUser('user@example.com')?->getRoles());
     }
 
     public function testCredentialChangesRequireCurrentPassword(): void
@@ -72,8 +73,10 @@ class PermissionsTest extends WebTestCase
 
         $this->request('PATCH', '/api/profile', $user, ['password' => 'new-password-123', 'currentPassword' => self::PASSWORD]);
         self::assertResponseIsSuccessful();
-        $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
-        self::assertTrue($hasher->isPasswordValid($this->reloadUser('user@example.com'), 'new-password-123'));
+        $hasher = $this->service(UserPasswordHasherInterface::class);
+        $user = $this->reloadUser('user@example.com');
+        self::assertNotNull($user);
+        self::assertTrue($hasher->isPasswordValid($user, 'new-password-123'));
     }
 
     public function testInvalidRegistrationIsNotPersisted(): void
@@ -91,7 +94,7 @@ class PermissionsTest extends WebTestCase
         $this->request('PATCH', '/api/profile', $user, ['firstName' => str_repeat('x', 101)]);
 
         self::assertResponseStatusCodeSame(400);
-        self::assertNull($this->reloadUser('user@example.com')->getFirstName());
+        self::assertNull($this->reloadUser('user@example.com')?->getFirstName());
     }
 
     public function testAnonymousVisitorsOnlySeePublishedPages(): void
@@ -121,10 +124,10 @@ class PermissionsTest extends WebTestCase
 
         foreach ([[$author, 200], [$admin, 200], [$other, 404]] as [$user, $status]) {
             $this->request('GET', '/api/pages/'.$draft->getId(), $user);
-            self::assertResponseStatusCodeSame($status, $user->getEmail());
+            self::assertResponseStatusCodeSame($status, (string) $user->getEmail());
 
             $expected = $status === 200 ? [$draft->getId()] : [];
-            self::assertSame($expected, array_column($this->request('GET', '/api/pages', $user)['data'], 'id'), $user->getEmail());
+            self::assertSame($expected, array_column($this->request('GET', '/api/pages', $user)['data'], 'id'), (string) $user->getEmail());
         }
     }
 
@@ -204,31 +207,85 @@ class PermissionsTest extends WebTestCase
         $this->client->request('POST', '/api/categories', server: [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_AUTHORIZATION' => 'Bearer '.$login['token'],
-        ], content: json_encode($category));
+        ], content: json_encode($category, JSON_THROW_ON_ERROR));
         self::assertResponseStatusCodeSame(201);
+    }
+
+    public function testOnlyTheAuthorOrAnAdminCanChangeContent(): void
+    {
+        $author = $this->createUser('author@example.com');
+        $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
+        $other = $this->createUser('other@example.com');
+        [$page, $block, $media] = $this->createPage($author, 'published');
+
+        $writes = [
+            ['PUT', '/api/pages/'.$page->getId(), ['title' => 'Changed']],
+            ['POST', '/api/blocks', ['type' => 'text', 'pageId' => $page->getId(), 'content' => 'More']],
+            ['PUT', '/api/blocks/'.$block->getId(), ['content' => 'Changed']],
+            ['POST', '/api/media', ['filename' => 'b.png', 'type' => 'image', 'url' => '/uploads/b.png', 'blockId' => $block->getId()]],
+            ['PUT', '/api/media/'.$media->getId(), ['alt' => 'Changed']],
+        ];
+        foreach ($writes as [$method, $uri, $body]) {
+            $this->request($method, $uri, $other, $body);
+            self::assertResponseStatusCodeSame(403, "other user: $method $uri");
+
+            foreach ([$author, $admin] as $user) {
+                $this->request($method, $uri, $user, $body);
+                self::assertResponseIsSuccessful("$method $uri as ".$user->getEmail());
+            }
+        }
+
+        // Deletes, innermost first; the other user is refused every time
+        foreach (['/api/media/'.$media->getId(), '/api/blocks/'.$block->getId(), '/api/pages/'.$page->getId()] as $uri) {
+            $this->request('DELETE', $uri, $other);
+            self::assertResponseStatusCodeSame(403, "other user: DELETE $uri");
+
+            $this->request('DELETE', $uri, $author);
+            self::assertResponseIsSuccessful("author: DELETE $uri");
+        }
+    }
+
+    /**
+     * @template T of object
+     * @param class-string<T> $id
+     * @return T
+     */
+    private function service(string $id): object
+    {
+        $service = static::getContainer()->get($id);
+        self::assertInstanceOf($id, $service);
+
+        return $service;
     }
 
     private function em(): EntityManagerInterface
     {
-        return static::getContainer()->get(EntityManagerInterface::class);
+        return $this->service(EntityManagerInterface::class);
     }
 
+    /**
+     * @param array<string, mixed>|null $body
+     * @return array<mixed>
+     */
     private function request(string $method, string $uri, ?User $as = null, ?array $body = null): array
     {
         $server = ['CONTENT_TYPE' => 'application/json'];
         if ($as) {
-            $server['HTTP_AUTHORIZATION'] = 'Bearer '.static::getContainer()->get(JWTTokenManagerInterface::class)->create($as);
+            $server['HTTP_AUTHORIZATION'] = 'Bearer '.$this->service(JWTTokenManagerInterface::class)->create($as);
         }
 
-        $this->client->request($method, $uri, server: $server, content: $body === null ? null : json_encode($body));
+        $this->client->request($method, $uri, server: $server, content: $body === null ? null : json_encode($body, JSON_THROW_ON_ERROR));
 
-        return json_decode($this->client->getResponse()->getContent(), true) ?? [];
+        return json_decode((string) $this->client->getResponse()->getContent(), true) ?? [];
     }
 
+    /**
+     * @param list<string> $roles
+     */
     private function createUser(string $email, array $roles = []): User
     {
         $user = (new User())->setEmail($email)->setRoles($roles);
-        $user->setPassword(static::getContainer()->get(UserPasswordHasherInterface::class)->hashPassword($user, self::PASSWORD));
+        $user->setPassword($this->service(UserPasswordHasherInterface::class)->hashPassword($user, self::PASSWORD));
 
         $this->em()->persist($user);
         $this->em()->flush();

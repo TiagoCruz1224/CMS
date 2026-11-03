@@ -16,7 +16,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-#[Route('/api/pages')]
+#[Route('/api/pages', requirements: ['id' => '\d{1,18}'])]
 class PageController extends AbstractController
 {
     public function __construct(
@@ -31,8 +31,15 @@ class PageController extends AbstractController
     #[Route('', name: 'api_pages_list', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
-        $page = $request->query->getInt('page', 1);
-        $limit = $request->query->getInt('limit', 10);
+        $page = $request->query->filter('page', 1, \FILTER_VALIDATE_INT, ['flags' => \FILTER_NULL_ON_FAILURE]);
+        $limit = $request->query->filter('limit', 10, \FILTER_VALIDATE_INT, ['flags' => \FILTER_NULL_ON_FAILURE]);
+        if ($page === null || $limit === null) {
+            return $this->json([
+                'error' => 'page and limit must be integers'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+        $page = max(1, $page);
+        $limit = min(100, max(1, $limit));
         $status = $request->query->get('status');
 
         if ($status === 'published') {
@@ -91,52 +98,48 @@ class PageController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        try {
-            $pageData = [];
-            
-            if (isset($data['slug'])) {
-                $pageData['slug'] = $data['slug'];
-            }
-            
-            if (isset($data['content'])) {
-                $pageData['content'] = $data['content'];
-            }
-            
-            if (isset($data['status'])) {
-                $pageData['status'] = $data['status'];
-            }
+        $pageData = [];
 
-            if (isset($data['categoryId'])) {
-                $category = $this->categoryRepository->find($data['categoryId']);
-                if ($category) {
-                    $pageData['category'] = $category;
-                }
-            }
+        if (isset($data['slug'])) {
+            $pageData['slug'] = $data['slug'];
+        }
 
-            $page = $this->pageService->createPage($data['title'], $user, $pageData);
+        if (isset($data['content'])) {
+            $pageData['content'] = $data['content'];
+        }
 
-            $errors = $this->validator->validate($page);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-                }
+        if (isset($data['status'])) {
+            $pageData['status'] = $data['status'];
+        }
+
+        if (isset($data['categoryId'])) {
+            $category = $this->categoryRepository->find($data['categoryId']);
+            if (!$category) {
                 return $this->json([
-                    'errors' => $errorMessages
+                    'error' => 'Category not found'
                 ], Response::HTTP_BAD_REQUEST);
             }
-
-            $json = $this->serializer->serialize($page, 'json', [
-                'groups' => ['page:read']
-            ]);
-
-            return new JsonResponse($json, Response::HTTP_CREATED, [], true);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to create page: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            $pageData['category'] = $category;
         }
+
+        $page = $this->pageService->createPage($data['title'], $user, $pageData);
+
+        $errors = $this->validator->validate($page);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
+            }
+            return $this->json([
+                'errors' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $json = $this->serializer->serialize($page, 'json', [
+            'groups' => ['page:read']
+        ]);
+
+        return new JsonResponse($json, Response::HTTP_CREATED, [], true);
     }
 
     #[Route('/{id}', name: 'api_pages_update', methods: ['PUT', 'PATCH'])]
@@ -153,8 +156,7 @@ class PageController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($page->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $page)) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
@@ -162,59 +164,52 @@ class PageController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        try {
-            if (isset($data['categoryId'])) {
-                $category = $this->categoryRepository->find($data['categoryId']);
-                if ($category) {
-                    $data['category'] = $category;
-                }
-                unset($data['categoryId']);
-            }
-
-            // Convert date strings to DateTimeImmutable
-            if (isset($data['publishAt']) && is_string($data['publishAt'])) {
-                $data['publishAt'] = new \DateTimeImmutable($data['publishAt']);
-            }
-
-            if (isset($data['unpublishAt']) && is_string($data['unpublishAt'])) {
-                $data['unpublishAt'] = new \DateTimeImmutable($data['unpublishAt']);
-            }
-
-            $changeNote = $data['changeNote'] ?? null;
-            unset($data['changeNote']);
-
-            $this->pageService->updatePage($page, $data, $user, $changeNote);
-
-            $errors = $this->validator->validate($page);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-                }
+        if (isset($data['categoryId'])) {
+            $category = $this->categoryRepository->find($data['categoryId']);
+            if (!$category) {
                 return $this->json([
-                    'errors' => $errorMessages
+                    'error' => 'Category not found'
                 ], Response::HTTP_BAD_REQUEST);
             }
-
-            $json = $this->serializer->serialize($page, 'json', [
-                'groups' => ['page:read']
-            ]);
-
-            return new JsonResponse($json, Response::HTTP_OK, [], true);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to update page: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            $data['category'] = $category;
+            unset($data['categoryId']);
         }
+
+        // Convert date strings to DateTimeImmutable
+        if (isset($data['publishAt']) && is_string($data['publishAt'])) {
+            $data['publishAt'] = new \DateTimeImmutable($data['publishAt']);
+        }
+
+        if (isset($data['unpublishAt']) && is_string($data['unpublishAt'])) {
+            $data['unpublishAt'] = new \DateTimeImmutable($data['unpublishAt']);
+        }
+
+        $changeNote = $data['changeNote'] ?? null;
+        unset($data['changeNote']);
+
+        $this->pageService->updatePage($page, $data, $user, $changeNote);
+
+        $errors = $this->validator->validate($page);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
+            }
+            return $this->json([
+                'errors' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $json = $this->serializer->serialize($page, 'json', [
+            'groups' => ['page:read']
+        ]);
+
+        return new JsonResponse($json, Response::HTTP_OK, [], true);
     }
 
     #[Route('/{id}', name: 'api_pages_delete', methods: ['DELETE'])]
     public function delete(int $id): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $page = $this->pageRepository->find($id);
 
         if (!$page) {
@@ -223,24 +218,16 @@ class PageController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($page->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $page)) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
         }
 
-        try {
-            $this->pageService->deletePage($page);
+        $this->pageService->deletePage($page);
 
-            return $this->json([
-                'message' => 'Page deleted successfully'
-            ], Response::HTTP_OK);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to delete page: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        return $this->json([
+            'message' => 'Page deleted successfully'
+        ], Response::HTTP_OK);
     }
 }

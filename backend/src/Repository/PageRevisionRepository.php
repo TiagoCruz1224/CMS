@@ -18,6 +18,7 @@ class PageRevisionRepository extends ServiceEntityRepository
 
     /**
      * Find all revisions for a page
+     * @return list<PageRevision>
      */
     public function findByPage(int $pageId, int $limit = 10): array
     {

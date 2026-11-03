@@ -3,7 +3,6 @@
 namespace App\Controller\Api;
 
 use App\Entity\Media;
-use App\Entity\User;
 use App\Repository\BlockRepository;
 use App\Repository\MediaRepository;
 use App\Security\Voter\PageVoter;
@@ -16,7 +15,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-#[Route('/api/media')]
+#[Route('/api/media', requirements: ['id' => '\d{1,18}'])]
 class MediaController extends AbstractController
 {
     public function __construct(
@@ -34,7 +33,7 @@ class MediaController extends AbstractController
         // ponytail: filters in PHP after findAll(); move the rule into a query if the library grows large
         $media = array_values(array_filter(
             $this->mediaRepository->findAll(),
-            fn (Media $item) => $this->isGranted(PageVoter::VIEW, $item->getBlock()->getPage())
+            fn (Media $item) => $this->isGranted(PageVoter::VIEW, $item->getBlock()?->getPage())
         ));
 
         $json = $this->serializer->serialize($media, 'json', [
@@ -49,7 +48,7 @@ class MediaController extends AbstractController
     {
         $media = $this->mediaRepository->find($id);
 
-        if (!$media || !$this->isGranted(PageVoter::VIEW, $media->getBlock()->getPage())) {
+        if (!$media || !$this->isGranted(PageVoter::VIEW, $media->getBlock()?->getPage())) {
             return $this->json([
                 'error' => 'Media not found'
             ], Response::HTTP_NOT_FOUND);
@@ -65,9 +64,6 @@ class MediaController extends AbstractController
     #[Route('', name: 'api_media_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $data = json_decode($request->getContent(), true);
 
         if (!isset($data['filename']) || !isset($data['type']) || !isset($data['url']) || !isset($data['blockId'])) {
@@ -84,65 +80,54 @@ class MediaController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($block->getPage()->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $block->getPage())) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
         }
 
-        try {
-            $media = new Media();
-            $media->setFilename($data['filename']);
-            $media->setType($data['type']);
-            $media->setUrl($data['url']);
-            $media->setBlock($block);
+        $media = new Media();
+        $media->setFilename($data['filename']);
+        $media->setType($data['type']);
+        $media->setUrl($data['url']);
+        $media->setBlock($block);
 
-            if (isset($data['mimeType'])) {
-                $media->setMimeType($data['mimeType']);
-            }
-
-            if (isset($data['size'])) {
-                $media->setSize($data['size']);
-            }
-
-            if (isset($data['alt'])) {
-                $media->setAlt($data['alt']);
-            }
-
-            $errors = $this->validator->validate($media);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-                }
-                return $this->json([
-                    'errors' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST);
-            }
-
-            $this->entityManager->persist($media);
-            $this->entityManager->flush();
-
-            $json = $this->serializer->serialize($media, 'json', [
-                'groups' => ['media:read']
-            ]);
-
-            return new JsonResponse($json, Response::HTTP_CREATED, [], true);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to create media: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        if (isset($data['mimeType'])) {
+            $media->setMimeType($data['mimeType']);
         }
+
+        if (isset($data['size'])) {
+            $media->setSize($data['size']);
+        }
+
+        if (isset($data['alt'])) {
+            $media->setAlt($data['alt']);
+        }
+
+        $errors = $this->validator->validate($media);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
+            }
+            return $this->json([
+                'errors' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $this->entityManager->persist($media);
+        $this->entityManager->flush();
+
+        $json = $this->serializer->serialize($media, 'json', [
+            'groups' => ['media:read']
+        ]);
+
+        return new JsonResponse($json, Response::HTTP_CREATED, [], true);
     }
 
     #[Route('/{id}', name: 'api_media_update', methods: ['PUT', 'PATCH'])]
     public function update(int $id, Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $media = $this->mediaRepository->find($id);
 
         if (!$media) {
@@ -151,8 +136,7 @@ class MediaController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($media->getBlock()->getPage()->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $media->getBlock()?->getPage())) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
@@ -160,63 +144,53 @@ class MediaController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        try {
-            if (isset($data['filename'])) {
-                $media->setFilename($data['filename']);
-            }
-
-            if (isset($data['type'])) {
-                $media->setType($data['type']);
-            }
-
-            if (isset($data['url'])) {
-                $media->setUrl($data['url']);
-            }
-
-            if (isset($data['alt'])) {
-                $media->setAlt($data['alt']);
-            }
-
-            if (isset($data['mimeType'])) {
-                $media->setMimeType($data['mimeType']);
-            }
-
-            if (isset($data['size'])) {
-                $media->setSize($data['size']);
-            }
-
-            $errors = $this->validator->validate($media);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-                }
-                return $this->json([
-                    'errors' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST);
-            }
-
-            $this->entityManager->flush();
-
-            $json = $this->serializer->serialize($media, 'json', [
-                'groups' => ['media:read']
-            ]);
-
-            return new JsonResponse($json, Response::HTTP_OK, [], true);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to update media: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        if (isset($data['filename'])) {
+            $media->setFilename($data['filename']);
         }
+
+        if (isset($data['type'])) {
+            $media->setType($data['type']);
+        }
+
+        if (isset($data['url'])) {
+            $media->setUrl($data['url']);
+        }
+
+        if (isset($data['alt'])) {
+            $media->setAlt($data['alt']);
+        }
+
+        if (isset($data['mimeType'])) {
+            $media->setMimeType($data['mimeType']);
+        }
+
+        if (isset($data['size'])) {
+            $media->setSize($data['size']);
+        }
+
+        $errors = $this->validator->validate($media);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
+            }
+            return $this->json([
+                'errors' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $this->entityManager->flush();
+
+        $json = $this->serializer->serialize($media, 'json', [
+            'groups' => ['media:read']
+        ]);
+
+        return new JsonResponse($json, Response::HTTP_OK, [], true);
     }
 
     #[Route('/{id}', name: 'api_media_delete', methods: ['DELETE'])]
     public function delete(int $id): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $media = $this->mediaRepository->find($id);
 
         if (!$media) {
@@ -225,25 +199,17 @@ class MediaController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($media->getBlock()->getPage()->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $media->getBlock()?->getPage())) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
         }
 
-        try {
-            $this->entityManager->remove($media);
-            $this->entityManager->flush();
+        $this->entityManager->remove($media);
+        $this->entityManager->flush();
 
-            return $this->json([
-                'message' => 'Media deleted successfully'
-            ], Response::HTTP_OK);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to delete media: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        return $this->json([
+            'message' => 'Media deleted successfully'
+        ], Response::HTTP_OK);
     }
 }

@@ -19,6 +19,9 @@ class UserService
     ) {
     }
 
+    /**
+     * @param list<string> $roles
+     */
     public function createUser(string $email, string $password, array $roles = [], ?string $firstName = null, ?string $lastName = null): User
     {
         $user = new User();
@@ -42,6 +45,7 @@ class UserService
 
     /**
      * Self-service profile update: roles are never taken from request data.
+     * @param array<string, mixed> $data
      */
     public function updateUser(User $user, array $data): User
     {
