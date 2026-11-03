@@ -47,6 +47,14 @@ REST API of the CMS, built with Symfony 6.4. It provides:
 
 ## API Endpoints
 
+### Errors
+
+Errors answer JSON with an `error` message, or an `errors` list for validation failures:
+
+- `400` - the body of a `POST`, `PUT` or `PATCH` request is not a JSON object, or the data is invalid
+- `401` - missing or invalid JWT; `403` - not allowed; `404` - not found or not visible to the caller
+- `409` - the email is already used by another account (registration or profile update)
+
 ### Authentication
 
 #### Register

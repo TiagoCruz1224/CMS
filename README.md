@@ -128,6 +128,8 @@ Full reference, including `?status=published`: [API documentation](backend/API_D
 - Media upload does not work end to end yet: the API stores media metadata (URL, type, alt text) but does not accept
   file uploads.
 - Categories and page revisions are available through the API only; the dashboard has no screens for them.
+- The Blocks screen cannot list blocks: the API has no `GET /api/blocks` endpoint (blocks are read one at a time or with
+  their page). Restoring a page revision is not supported either.
 - Dark mode covers the layout and login screen only.
 - No frontend tests yet.
 - Not deployed; there is no production configuration.
