@@ -15,8 +15,7 @@
     "vue-router": "4"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.14",
-    "@vitejs/plugin-vue": "3",
+    "@vitejs/plugin-vue": "4",
     "autoprefixer": "10",
     "postcss": "8",
     "tailwindcss": "3",

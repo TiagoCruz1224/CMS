@@ -56,11 +56,6 @@ export const pageService = {
   async getRevisions(id) {
     const response = await api.get(`/pages/${id}/revisions`)
     return response.data
-  },
-
-  async restoreRevision(pageId, revisionId) {
-    const response = await api.post(`/pages/${pageId}/revisions/${revisionId}/restore`)
-    return response.data
   }
 }
 
