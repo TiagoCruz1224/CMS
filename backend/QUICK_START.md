@@ -12,14 +12,14 @@
 
 ### 1. Install Dependencies
 ```bash
-cd /home/tiago/CMS/backend
+cd backend
 composer install
 ```
 
 ### 2. Configure Environment
-Your `.env.local` is already configured:
+Copy `.env.example` to `.env` and set your database URL:
 ```bash
-DATABASE_URL="mysql://tiago:12345@127.0.0.1:3306/cms_db?serverVersion=8.0"
+DATABASE_URL="mysql://db_user:db_password@127.0.0.1:3306/cms_db?serverVersion=8.0"
 ```
 
 ### 3. Database Setup
@@ -70,10 +70,9 @@ curl -X POST http://localhost:8000/api/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@example.com",
-    "password": "password123",
+    "password": "<your-password>",
     "firstName": "Admin",
-    "lastName": "User",
-    "roles": ["ROLE_ADMIN"]
+    "lastName": "User"
   }'
 ```
 
@@ -83,7 +82,7 @@ curl -X POST http://localhost:8000/api/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@example.com",
-    "password": "password123"
+    "password": "<your-password>"
   }'
 ```
 
@@ -172,7 +171,7 @@ curl http://localhost:8000/api/pages
 POST /api/login
 {
   "email": "user@example.com",
-  "password": "password123"
+  "password": "<your-password>"
 }
 ```
 
@@ -276,14 +275,17 @@ async function createPage(pageData) {
 ## 🛠️ Common Tasks
 
 ### Create Admin User
+Registration always creates a regular user (`ROLE_USER`); roles sent to the API are ignored.
+Register the account, then promote it from the console:
 ```bash
 curl -X POST http://localhost:8000/api/register \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "admin@cms.local",
-    "password": "admin123",
-    "roles": ["ROLE_ADMIN"]
+    "email": "admin@example.com",
+    "password": "<your-password>"
   }'
+
+php bin/console dbal:run-sql "UPDATE user SET roles = '[\"ROLE_ADMIN\"]' WHERE email = 'admin@example.com'"
 ```
 
 ### Create Category (Admin Only)
@@ -322,9 +324,9 @@ curl http://localhost:8000/api/pages/1/revisions \
 ## 🐛 Troubleshooting
 
 ### Database Connection Error
-Check `.env.local`:
+Check `.env` (or `.env.local`):
 ```bash
-DATABASE_URL="mysql://tiago:12345@127.0.0.1:3306/cms_db?serverVersion=8.0"
+DATABASE_URL="mysql://db_user:db_password@127.0.0.1:3306/cms_db?serverVersion=8.0"
 ```
 
 ### JWT Token Error
