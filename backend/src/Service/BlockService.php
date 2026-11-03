@@ -13,6 +13,9 @@ class BlockService
     ) {
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function createBlock(string $type, Page $page, array $data = []): Block
     {
         $block = new Block();
@@ -40,6 +43,9 @@ class BlockService
         return $block;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function updateBlock(Block $block, array $data): Block
     {
         if (isset($data['type'])) {

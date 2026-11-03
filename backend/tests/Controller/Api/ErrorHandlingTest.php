@@ -252,6 +252,9 @@ class ErrorHandlingTest extends WebTestCase
         return static::getContainer()->get(EntityManagerInterface::class);
     }
 
+    /**
+     * @return array<mixed>
+     */
     private function send(string $method, string $uri, ?User $as, string $body): array
     {
         $server = ['CONTENT_TYPE' => 'application/json'];
@@ -264,6 +267,9 @@ class ErrorHandlingTest extends WebTestCase
         return json_decode($this->client->getResponse()->getContent(), true) ?? [];
     }
 
+    /**
+     * @param list<string> $roles
+     */
     private function createUser(string $email, array $roles = []): User
     {
         $user = (new User())->setEmail($email)->setRoles($roles);

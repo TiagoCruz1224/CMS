@@ -44,6 +44,9 @@ class Block
     #[Groups(['block:read', 'page:read'])]
     private Collection $media;
 
+    /**
+     * @var array<mixed>|null
+     */
     #[ORM\Column(type: Types::JSON, nullable: true)]
     #[Groups(['block:read', 'block:write', 'page:read'])]
     private ?array $settings = null;
@@ -136,11 +139,17 @@ class Block
         return $this;
     }
 
+    /**
+     * @return array<mixed>|null
+     */
     public function getSettings(): ?array
     {
         return $this->settings;
     }
 
+    /**
+     * @param array<mixed>|null $settings
+     */
     public function setSettings(?array $settings): static
     {
         $this->settings = $settings;

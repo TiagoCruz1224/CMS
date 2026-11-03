@@ -213,6 +213,10 @@ class PermissionsTest extends WebTestCase
         return static::getContainer()->get(EntityManagerInterface::class);
     }
 
+    /**
+     * @param array<string, mixed>|null $body
+     * @return array<mixed>
+     */
     private function request(string $method, string $uri, ?User $as = null, ?array $body = null): array
     {
         $server = ['CONTENT_TYPE' => 'application/json'];
@@ -225,6 +229,9 @@ class PermissionsTest extends WebTestCase
         return json_decode($this->client->getResponse()->getContent(), true) ?? [];
     }
 
+    /**
+     * @param list<string> $roles
+     */
     private function createUser(string $email, array $roles = []): User
     {
         $user = (new User())->setEmail($email)->setRoles($roles);

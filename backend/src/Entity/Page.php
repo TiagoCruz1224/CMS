@@ -68,6 +68,9 @@ class Page
     #[Groups(['page:read', 'page:write'])]
     private ?string $metaDescription = null;
 
+    /**
+     * @var array<mixed>|null
+     */
     #[ORM\Column(type: Types::JSON, nullable: true)]
     #[Groups(['page:read', 'page:write'])]
     private ?array $metaKeywords = null;
@@ -85,6 +88,9 @@ class Page
     #[Groups(['page:read', 'page:write'])]
     private ?\DateTimeImmutable $unpublishAt = null;
 
+    /**
+     * @var array<mixed>|null
+     */
     #[ORM\Column(type: Types::JSON, nullable: true)]
     #[Groups(['page:read', 'page:write'])]
     private ?array $ogTags = null;
@@ -244,11 +250,17 @@ class Page
         return $this;
     }
 
+    /**
+     * @return array<mixed>|null
+     */
     public function getMetaKeywords(): ?array
     {
         return $this->metaKeywords;
     }
 
+    /**
+     * @param array<mixed>|null $metaKeywords
+     */
     public function setMetaKeywords(?array $metaKeywords): static
     {
         $this->metaKeywords = $metaKeywords;
@@ -292,11 +304,17 @@ class Page
         return $this;
     }
 
+    /**
+     * @return array<mixed>|null
+     */
     public function getOgTags(): ?array
     {
         return $this->ogTags;
     }
 
+    /**
+     * @param array<mixed>|null $ogTags
+     */
     public function setOgTags(?array $ogTags): static
     {
         $this->ogTags = $ogTags;

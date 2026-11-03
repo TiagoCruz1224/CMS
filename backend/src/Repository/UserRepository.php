@@ -43,6 +43,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
     /**
      * Find all admin users
+     * @return list<User>
      */
     public function findAdmins(): array
     {

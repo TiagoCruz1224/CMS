@@ -20,6 +20,7 @@ class PageRepository extends ServiceEntityRepository
 
     /**
      * Find all pages by a specific user
+     * @return list<Page>
      */
     public function findByAuthor(User $author): array
     {
@@ -33,6 +34,7 @@ class PageRepository extends ServiceEntityRepository
 
     /**
      * Find pages that are public right now (same rule as Page::isPublished())
+     * @return list<Page>
      */
     public function findPublished(): array
     {
@@ -53,6 +55,7 @@ class PageRepository extends ServiceEntityRepository
     /**
      * Find pages with pagination. Unless $includeDrafts is set, only published
      * pages and pages written by $author are returned.
+     * @return list<Page>
      */
     public function findPaginated(int $page = 1, int $limit = 10, bool $includeDrafts = false, ?User $author = null): array
     {
@@ -99,6 +102,7 @@ class PageRepository extends ServiceEntityRepository
 
     /**
      * Find pages by category
+     * @return list<Page>
      */
     public function findByCategory(int $categoryId): array
     {

@@ -18,6 +18,9 @@ class PageService
     ) {
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function createPage(string $title, User $author, array $data = []): Page
     {
         $page = new Page();
@@ -82,6 +85,9 @@ class PageService
         return $page;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public function updatePage(Page $page, array $data, ?User $user = null, ?string $changeNote = null): Page
     {
         if (isset($data['title'])) {
@@ -153,16 +159,25 @@ class PageService
         $this->entityManager->flush();
     }
 
+    /**
+     * @return list<Page>
+     */
     public function findByAuthor(User $author): array
     {
         return $this->pageRepository->findByAuthor($author);
     }
 
+    /**
+     * @return list<Page>
+     */
     public function findPublished(): array
     {
         return $this->pageRepository->findPublished();
     }
 
+    /**
+     * @return array{data: list<Page>, total: int, page: int, limit: int, totalPages: float}
+     */
     public function findPaginated(int $page = 1, int $limit = 10, bool $includeDrafts = false, ?User $author = null): array
     {
         $total = $this->pageRepository->countAll($includeDrafts, $author);

@@ -11,6 +11,7 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 /**
  * VIEW: published pages are public; anything else only for its author or an admin.
  * EDIT: author or admin.
+ * @extends Voter<string, Page>
  */
 class PageVoter extends Voter
 {

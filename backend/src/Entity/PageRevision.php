@@ -29,6 +29,9 @@ class PageRevision
     #[Groups(['revision:read'])]
     private ?string $content = null;
 
+    /**
+     * @var list<array<string, mixed>>|null
+     */
     #[ORM\Column(type: Types::JSON, nullable: true)]
     #[Groups(['revision:read'])]
     private ?array $blocks = null;
@@ -93,11 +96,17 @@ class PageRevision
         return $this;
     }
 
+    /**
+     * @return list<array<string, mixed>>|null
+     */
     public function getBlocks(): ?array
     {
         return $this->blocks;
     }
 
+    /**
+     * @param list<array<string, mixed>>|null $blocks
+     */
     public function setBlocks(?array $blocks): static
     {
         $this->blocks = $blocks;
