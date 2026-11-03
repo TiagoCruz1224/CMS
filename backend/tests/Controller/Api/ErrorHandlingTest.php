@@ -105,6 +105,34 @@ class ErrorHandlingTest extends WebTestCase
         self::assertStringContainsString('UNIQUE constraint failed', (string) file_get_contents($log, offset: $logSize));
     }
 
+    public function testMalformedIdsAndPagingAreClientErrors(): void
+    {
+        $author = $this->createUser('author@example.com');
+        [$page] = $this->createContent($author);
+
+        // Non-numeric or oversized ids do not match the routes
+        foreach (['/api/pages/abc', '/api/pages/99999999999999999999', '/api/categories/99999999999999999999'] as $uri) {
+            $this->send('GET', $uri, null, '');
+            self::assertResponseStatusCodeSame(404, $uri);
+        }
+        $this->send('GET', '/api/pages/'.$page->getId().'/revisions/zzz', $author, '');
+        self::assertResponseStatusCodeSame(404);
+
+        // Out-of-range paging is clamped to page >= 1 and 1 <= limit <= 100
+        foreach (['limit=0', 'page=-1&limit=-5', 'limit=100000'] as $query) {
+            $list = $this->send('GET', '/api/pages?'.$query, null, '');
+            self::assertResponseStatusCodeSame(200, $query);
+            self::assertGreaterThanOrEqual(1, $list['page'], $query);
+            self::assertGreaterThanOrEqual(1, $list['limit'], $query);
+            self::assertLessThanOrEqual(100, $list['limit'], $query);
+            self::assertGreaterThanOrEqual(0, $list['totalPages'], $query);
+        }
+
+        // Values that are not integers at all are a bad request
+        $this->send('GET', '/api/pages?limit=99999999999999999999', null, '');
+        self::assertResponseStatusCodeSame(400);
+    }
+
     private function em(): EntityManagerInterface
     {
         return static::getContainer()->get(EntityManagerInterface::class);

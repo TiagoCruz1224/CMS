@@ -16,7 +16,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-#[Route('/api/pages')]
+#[Route('/api/pages', requirements: ['id' => '\d{1,18}'])]
 class PageController extends AbstractController
 {
     public function __construct(
@@ -31,8 +31,15 @@ class PageController extends AbstractController
     #[Route('', name: 'api_pages_list', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
-        $page = $request->query->getInt('page', 1);
-        $limit = $request->query->getInt('limit', 10);
+        $page = $request->query->filter('page', 1, \FILTER_VALIDATE_INT, ['flags' => \FILTER_NULL_ON_FAILURE]);
+        $limit = $request->query->filter('limit', 10, \FILTER_VALIDATE_INT, ['flags' => \FILTER_NULL_ON_FAILURE]);
+        if ($page === null || $limit === null) {
+            return $this->json([
+                'error' => 'page and limit must be integers'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+        $page = max(1, $page);
+        $limit = min(100, max(1, $limit));
         $status = $request->query->get('status');
 
         if ($status === 'published') {

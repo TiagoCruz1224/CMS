@@ -13,7 +13,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-#[Route('/api/categories')]
+#[Route('/api/categories', requirements: ['id' => '\d{1,18}'])]
 class CategoryController extends AbstractController
 {
     public function __construct(

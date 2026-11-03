@@ -16,7 +16,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-#[Route('/api/media')]
+#[Route('/api/media', requirements: ['id' => '\d{1,18}'])]
 class MediaController extends AbstractController
 {
     public function __construct(

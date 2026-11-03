@@ -16,7 +16,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-#[Route('/api/blocks')]
+#[Route('/api/blocks', requirements: ['id' => '\d{1,18}'])]
 class BlockController extends AbstractController
 {
     public function __construct(

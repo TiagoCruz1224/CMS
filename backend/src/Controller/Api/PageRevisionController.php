@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 
-#[Route('/api/pages')]
+#[Route('/api/pages', requirements: ['id' => '\d{1,18}', 'pageId' => '\d{1,18}', 'revisionId' => '\d{1,18}'])]
 class PageRevisionController extends AbstractController
 {
     public function __construct(
