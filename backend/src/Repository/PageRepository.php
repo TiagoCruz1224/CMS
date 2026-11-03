@@ -73,7 +73,7 @@ class PageRepository extends ServiceEntityRepository
      */
     public function countAll(bool $includeDrafts = false, ?User $author = null): int
     {
-        return $this->visibleTo($includeDrafts, $author)
+        return (int) $this->visibleTo($includeDrafts, $author)
             ->select('COUNT(p.id)')
             ->getQuery()
             ->getSingleScalarResult();
