@@ -6,6 +6,7 @@ use App\Entity\Page;
 use App\Entity\User;
 use App\Repository\CategoryRepository;
 use App\Repository\PageRepository;
+use App\Security\Voter\PageVoter;
 use App\Service\PageService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -41,7 +42,13 @@ class PageController extends AbstractController
                 'total' => count($pages),
             ];
         } else {
-            $result = $this->pageService->findPaginated($page, $limit);
+            $user = $this->getUser();
+            $result = $this->pageService->findPaginated(
+                $page,
+                $limit,
+                $this->isGranted('ROLE_ADMIN'),
+                $user instanceof User ? $user : null
+            );
         }
 
         $json = $this->serializer->serialize($result, 'json', [
@@ -56,7 +63,8 @@ class PageController extends AbstractController
     {
         $page = $this->pageRepository->find($id);
 
-        if (!$page) {
+        // Hidden pages answer 404 rather than 403 so their existence is not revealed
+        if (!$page || !$this->isGranted(PageVoter::VIEW, $page)) {
             return $this->json([
                 'error' => 'Page not found'
             ], Response::HTTP_NOT_FOUND);

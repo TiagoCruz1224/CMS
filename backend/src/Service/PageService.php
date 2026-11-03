@@ -163,14 +163,16 @@ class PageService
         return $this->pageRepository->findPublished();
     }
 
-    public function findPaginated(int $page = 1, int $limit = 10): array
+    public function findPaginated(int $page = 1, int $limit = 10, bool $includeDrafts = false, ?User $author = null): array
     {
+        $total = $this->pageRepository->countAll($includeDrafts, $author);
+
         return [
-            'data' => $this->pageRepository->findPaginated($page, $limit),
-            'total' => $this->pageRepository->countAll(),
+            'data' => $this->pageRepository->findPaginated($page, $limit, $includeDrafts, $author),
+            'total' => $total,
             'page' => $page,
             'limit' => $limit,
-            'totalPages' => ceil($this->pageRepository->countAll() / $limit)
+            'totalPages' => ceil($total / $limit)
         ];
     }
 
