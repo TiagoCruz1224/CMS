@@ -60,7 +60,7 @@ Content-Type: application/json
 
 {
   "email": "user@example.com",
-  "password": "securepassword",
+  "password": "<your-password>",
   "firstName": "John",
   "lastName": "Doe"
 }
@@ -73,7 +73,7 @@ Content-Type: application/json
 
 {
   "email": "user@example.com",
-  "password": "securepassword"
+  "password": "<your-password>"
 }
 ```
 **Response:** JWT token
@@ -102,13 +102,35 @@ Content-Type: application/json
 
 #### List Pages (with pagination)
 ```http
-GET /api/pages?page=1&limit=10&status=published
+GET /api/pages?page=1&limit=10
 ```
+Returns the pages the caller may see, paginated:
+- anonymous: only pages that are public right now (see below)
+- authenticated user: public pages plus their own pages in any status
+- `ROLE_ADMIN`: all pages
+
+Response: `{"data": [...], "total": 12, "page": 1, "limit": 10, "totalPages": 2}`
+
+#### List Public Pages
+```http
+GET /api/pages?status=published
+```
+Returns the content that is public **right now**, the same list for every caller (anonymous, user or admin):
+pages with status `published` or `scheduled` whose publication window is open
+(`publishAt` empty or in the past, and `unpublishAt` empty or in the future).
+
+- Pagination is ignored: `page` and `limit` have no effect and all public pages are returned.
+- Response: `{"data": [...], "total": 3}` (no `page`, `limit` or `totalPages`).
+- Any other `status` value is ignored and the request behaves like the paginated list above.
 
 #### Get Single Page
 ```http
 GET /api/pages/{id}
 ```
+Pages that are not public right now are only visible to their author and admins.
+For anyone else they answer **404 Not Found** (not 403), so their existence is not revealed.
+The same applies to the blocks and media of hidden pages (`GET /api/blocks/{id}`, `GET /api/media/{id}`,
+and `GET /api/media` leaves them out).
 
 #### Create Page
 ```http
@@ -159,6 +181,7 @@ Authorization: Bearer {token}
 GET /api/pages/{id}/revisions
 Authorization: Bearer {token}
 ```
+Only the page author and admins can read revisions; anyone else gets 404.
 
 #### Get Specific Revision
 ```http
@@ -292,10 +315,13 @@ Authorization: Bearer {token}
 ## 🔐 Security & Access Control
 
 ### Public Endpoints
-- `GET /api/pages` - List pages
-- `GET /api/pages/{id}` - View single page
-- `POST /api/register` - Registration
+- `GET /api/pages` - List pages (anonymous callers only get public content)
+- `GET /api/pages/{id}` - View single page (hidden pages answer 404)
+- `GET /api/categories`, `GET /api/categories/{id}` - Categories
+- `POST /api/register` - Registration (always creates a `ROLE_USER` account; roles in the request are ignored)
 - `POST /api/login` - Login
+
+Sending a JWT to the public page endpoints also returns the caller's own drafts (all pages for admins).
 
 ### Authenticated Endpoints
 - All `POST`, `PUT`, `DELETE` operations require JWT token
@@ -303,7 +329,7 @@ Authorization: Bearer {token}
 - `ROLE_ADMIN` can edit/delete any content
 
 ### Authorization Rules
-- **Pages**: Author or Admin can edit/delete
+- **Pages**: Author or Admin can edit/delete; drafts and pages outside their publication window are visible to Author or Admin only
 - **Blocks**: Page author or Admin
 - **Media**: Block's page author or Admin
 - **Categories**: Admin only for create/update/delete
