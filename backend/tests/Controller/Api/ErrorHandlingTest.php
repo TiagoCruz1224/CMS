@@ -229,6 +229,24 @@ class ErrorHandlingTest extends WebTestCase
         self::assertSame($category->getId(), $created['category']['id'] ?? null);
     }
 
+    public function testRoutingErrorsAnswerJson(): void
+    {
+        $cases = [
+            ['GET', '/api/does-not-exist', 404, 'Not Found'],
+            ['DELETE', '/api/register', 405, 'Method Not Allowed'],
+            ['GET', '/api/pages?page[]=1', 400, 'Bad Request'],
+        ];
+        foreach ($cases as [$method, $uri, $status, $error]) {
+            $response = $this->send($method, $uri, null, '');
+            self::assertResponseStatusCodeSame($status, "$method $uri");
+            self::assertResponseHeaderSame('Content-Type', 'application/json', "$method $uri");
+            self::assertSame(['error' => $error], $response, "$method $uri");
+            if ($status === 405) {
+                self::assertResponseHeaderSame('Allow', 'POST');
+            }
+        }
+    }
+
     private function em(): EntityManagerInterface
     {
         return static::getContainer()->get(EntityManagerInterface::class);
