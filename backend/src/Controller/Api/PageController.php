@@ -14,17 +14,18 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Symfony\Component\Validator\Exception\ValidationFailedException;
 
 #[Route('/api/pages', requirements: ['id' => '\d{1,18}'])]
 class PageController extends AbstractController
 {
+    use ValidationErrorResponse;
+
     public function __construct(
         private PageService $pageService,
         private PageRepository $pageRepository,
         private CategoryRepository $categoryRepository,
-        private SerializerInterface $serializer,
-        private ValidatorInterface $validator
+        private SerializerInterface $serializer
     ) {
     }
 
@@ -122,17 +123,10 @@ class PageController extends AbstractController
             $pageData['category'] = $category;
         }
 
-        $page = $this->pageService->createPage($data['title'], $user, $pageData);
-
-        $errors = $this->validator->validate($page);
-        if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-            }
-            return $this->json([
-                'errors' => $errorMessages
-            ], Response::HTTP_BAD_REQUEST);
+        try {
+            $page = $this->pageService->createPage($data['title'], $user, $pageData);
+        } catch (ValidationFailedException $e) {
+            return $this->validationErrorResponse($e->getViolations());
         }
 
         $json = $this->serializer->serialize($page, 'json', [
@@ -187,17 +181,10 @@ class PageController extends AbstractController
         $changeNote = $data['changeNote'] ?? null;
         unset($data['changeNote']);
 
-        $this->pageService->updatePage($page, $data, $user, $changeNote);
-
-        $errors = $this->validator->validate($page);
-        if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-            }
-            return $this->json([
-                'errors' => $errorMessages
-            ], Response::HTTP_BAD_REQUEST);
+        try {
+            $this->pageService->updatePage($page, $data, $user, $changeNote);
+        } catch (ValidationFailedException $e) {
+            return $this->validationErrorResponse($e->getViolations());
         }
 
         $json = $this->serializer->serialize($page, 'json', [

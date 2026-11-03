@@ -7,6 +7,7 @@ use App\Entity\Category;
 use App\Entity\Media;
 use App\Entity\Page;
 use App\Entity\User;
+use App\Service\PageService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
@@ -89,22 +90,65 @@ class ErrorHandlingTest extends WebTestCase
 
     public function testInternalErrorsAreNotExposedButLogged(): void
     {
-        $author = $this->createUser('author@example.com');
-        $page = json_encode(['title' => 'Page', 'slug' => 'same-slug'], JSON_THROW_ON_ERROR);
-        $this->send('POST', '/api/pages', $author, $page);
-        self::assertResponseStatusCodeSame(201);
+        // A failure the client cannot cause or fix, with internal details in its message
+        $failing = $this->createStub(PageService::class);
+        $failing->method('findPaginated')->willThrowException(new \RuntimeException('SQLSTATE[HY000]: simulated database failure'));
+        static::getContainer()->set(PageService::class, $failing);
 
         $logDir = static::getContainer()->getParameter('kernel.logs_dir');
         self::assertIsString($logDir);
         $log = $logDir.'/test.log';
         $logSize = is_file($log) ? (int) filesize($log) : 0;
 
-        // The second page breaks the database unique constraint on slug
-        $response = $this->send('POST', '/api/pages', $author, $page);
+        $response = $this->send('GET', '/api/pages', null, '');
 
         self::assertResponseStatusCodeSame(500);
         self::assertSame(['error' => 'Internal server error'], $response);
-        self::assertStringContainsString('UNIQUE constraint failed', (string) file_get_contents($log, offset: $logSize));
+        self::assertStringContainsString('simulated database failure', (string) file_get_contents($log, offset: $logSize));
+    }
+
+    public function testDuplicateSlugsAnswer409(): void
+    {
+        $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
+
+        $this->send('POST', '/api/pages', $admin, json_encode(['title' => 'A', 'slug' => 'taken'], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(201);
+        $response = $this->send('POST', '/api/pages', $admin, json_encode(['title' => 'B', 'slug' => 'taken'], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(409);
+        self::assertArrayHasKey('slug', $response['errors'] ?? []);
+
+        $other = $this->send('POST', '/api/pages', $admin, json_encode(['title' => 'C', 'slug' => 'free'], JSON_THROW_ON_ERROR));
+        $this->send('PUT', '/api/pages/'.$other['id'], $admin, json_encode(['slug' => 'taken'], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(409);
+
+        $this->send('POST', '/api/categories', $admin, json_encode(['name' => 'News', 'slug' => 'news'], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(201);
+        $this->send('POST', '/api/categories', $admin, json_encode(['name' => 'More news', 'slug' => 'news'], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(409);
+        $category = $this->send('POST', '/api/categories', $admin, json_encode(['name' => 'Events', 'slug' => 'events'], JSON_THROW_ON_ERROR));
+        $this->send('PUT', '/api/categories/'.$category['id'], $admin, json_encode(['slug' => 'news'], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(409);
+    }
+
+    public function testInvalidPagesAreNotSaved(): void
+    {
+        $author = $this->createUser('author@example.com');
+
+        $this->send('POST', '/api/pages', $author, json_encode(['title' => 'Bad', 'slug' => 'bad', 'status' => 'bogus'], JSON_THROW_ON_ERROR));
+
+        self::assertResponseStatusCodeSame(400);
+        $this->em()->clear();
+        self::assertNull($this->em()->getRepository(Page::class)->findOneBy(['slug' => 'bad']));
+    }
+
+    public function testTotalPagesIsAnInteger(): void
+    {
+        $author = $this->createUser('author@example.com');
+        $this->createContent($author);
+
+        $list = $this->send('GET', '/api/pages?limit=10', null, '');
+
+        self::assertSame(1, $list['totalPages']);
     }
 
     public function testMalformedIdsAndPagingAreClientErrors(): void
