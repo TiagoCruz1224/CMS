@@ -133,6 +133,24 @@ class ErrorHandlingTest extends WebTestCase
         self::assertResponseStatusCodeSame(400);
     }
 
+    public function testJsonListsAreNotAcceptedAsBodies(): void
+    {
+        $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
+        [$page] = $this->createContent($admin);
+
+        foreach ([['POST', '/api/pages'], ['PUT', '/api/pages/'.$page->getId()], ['PATCH', '/api/profile'], ['POST', '/api/categories']] as [$method, $uri]) {
+            foreach (['[]', '[1,2,3]', '[{"title":"x"}]'] as $body) {
+                $response = $this->send($method, $uri, $admin, $body);
+                self::assertSame(400, $this->client->getResponse()->getStatusCode(), "$method $uri with $body");
+                self::assertArrayHasKey('error', $response, "$method $uri with $body");
+            }
+        }
+
+        // An empty JSON object is still a valid (if useless) body
+        $this->send('PUT', '/api/pages/'.$page->getId(), $admin, '{}');
+        self::assertResponseIsSuccessful();
+    }
+
     private function em(): EntityManagerInterface
     {
         return static::getContainer()->get(EntityManagerInterface::class);

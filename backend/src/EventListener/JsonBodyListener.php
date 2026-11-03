@@ -24,13 +24,14 @@ final class JsonBodyListener
             return;
         }
 
+        // Decoded without "assoc", so a JSON object ({} included) is a stdClass and a list ([...]) is an array
         try {
-            $data = json_decode($request->getContent(), true, 512, JSON_THROW_ON_ERROR);
+            $data = json_decode($request->getContent(), false, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
             $data = null;
         }
 
-        if (!is_array($data)) {
+        if (!$data instanceof \stdClass) {
             $event->setResponse(new JsonResponse(['error' => 'Request body must be a valid JSON object'], Response::HTTP_BAD_REQUEST));
         }
     }
