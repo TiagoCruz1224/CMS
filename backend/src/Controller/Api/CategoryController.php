@@ -16,6 +16,8 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 #[Route('/api/categories', requirements: ['id' => '\d{1,18}'])]
 class CategoryController extends AbstractController
 {
+    use ValidationErrorResponse;
+
     public function __construct(
         private CategoryRepository $categoryRepository,
         private EntityManagerInterface $entityManager,
@@ -77,13 +79,7 @@ class CategoryController extends AbstractController
 
         $errors = $this->validator->validate($category);
         if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-            }
-            return $this->json([
-                'errors' => $errorMessages
-            ], Response::HTTP_BAD_REQUEST);
+            return $this->validationErrorResponse($errors);
         }
 
         $this->entityManager->persist($category);
@@ -125,13 +121,7 @@ class CategoryController extends AbstractController
 
         $errors = $this->validator->validate($category);
         if (count($errors) > 0) {
-            $errorMessages = [];
-            foreach ($errors as $error) {
-                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-            }
-            return $this->json([
-                'errors' => $errorMessages
-            ], Response::HTTP_BAD_REQUEST);
+            return $this->validationErrorResponse($errors);
         }
 
         $this->entityManager->flush();

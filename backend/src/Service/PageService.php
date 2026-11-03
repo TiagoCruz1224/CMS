@@ -8,13 +8,16 @@ use App\Entity\User;
 use App\Repository\PageRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\String\Slugger\SluggerInterface;
+use Symfony\Component\Validator\Exception\ValidationFailedException;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class PageService
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
         private PageRepository $pageRepository,
-        private SluggerInterface $slugger
+        private SluggerInterface $slugger,
+        private ValidatorInterface $validator
     ) {
     }
 
@@ -76,6 +79,7 @@ class PageService
             $page->setIsIndexable($data['isIndexable']);
         }
 
+        $this->validate($page);
         $this->entityManager->persist($page);
         $this->entityManager->flush();
 
@@ -143,6 +147,7 @@ class PageService
             $page->setIsIndexable($data['isIndexable']);
         }
 
+        $this->validate($page);
         $this->entityManager->flush();
 
         // Create revision after update
@@ -176,7 +181,7 @@ class PageService
     }
 
     /**
-     * @return array{data: list<Page>, total: int, page: int, limit: int, totalPages: float}
+     * @return array{data: list<Page>, total: int, page: int, limit: int, totalPages: int}
      */
     public function findPaginated(int $page = 1, int $limit = 10, bool $includeDrafts = false, ?User $author = null): array
     {
@@ -187,7 +192,7 @@ class PageService
             'total' => $total,
             'page' => $page,
             'limit' => $limit,
-            'totalPages' => ceil($total / $limit)
+            'totalPages' => (int) ceil($total / $limit)
         ];
     }
 
@@ -224,5 +229,15 @@ class PageService
     private function generateSlug(string $text): string
     {
         return strtolower($this->slugger->slug($text));
+    }
+
+    // Invalid pages are rejected before anything is written
+    private function validate(Page $page): void
+    {
+        $violations = $this->validator->validate($page);
+
+        if (count($violations) > 0) {
+            throw new ValidationFailedException($page, $violations);
+        }
     }
 }
