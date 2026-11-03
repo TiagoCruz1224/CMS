@@ -1,4 +1,4 @@
-# 🚀 Quick Setup Guide
+# Setup Guide
 
 ## Step-by-Step Installation
 
@@ -20,9 +20,9 @@ node -v
 mysql --version
 ```
 
-### 2. Clone & Navigate
+### 2. Clone the Repository
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/TiagoCruz1224/CMS.git
 cd CMS
 ```
 
@@ -66,13 +66,13 @@ With the server running, register through the API and then promote the account (
 curl -X POST http://localhost:8000/api/register \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "admin@example.com",
-    "password": "<choose-a-password>",
+    "email": "<admin-email>",
+    "password": "<password>",
     "firstName": "Admin",
     "lastName": "User"
   }'
 
-php bin/console dbal:run-sql "UPDATE user SET roles = '[\"ROLE_ADMIN\"]' WHERE email = 'admin@example.com'"
+php bin/console dbal:run-sql "UPDATE user SET roles = '[\"ROLE_ADMIN\"]' WHERE email = '<admin-email>'"
 ```
 
 ### 5. Frontend Setup
@@ -95,7 +95,7 @@ yarn dev
 - **Backend API**: http://localhost:8000/api
 - **Login**: the admin account from step 4 (there are no default credentials)
 
-## 🧪 Testing the API
+## Testing the API
 
 Run the backend test suite (functional tests on a throwaway SQLite database, no MySQL needed):
 
@@ -112,7 +112,7 @@ cd backend
 ./test-api.sh
 ```
 
-## 🔧 Common Issues
+## Common Issues
 
 ### Issue: JWT Keys Not Found
 **Solution:**
@@ -156,15 +156,14 @@ lsof -ti:8000 | xargs kill -9
 2. Verify proxy in `frontend/vite.config.js`
 3. Check browser console for errors
 
-## 📝 Next Steps
+## Next Steps
 
-1. ✅ Use a strong password for the admin account
-2. ✅ Replace the example values in `.env` (`APP_SECRET`, `JWT_PASSPHRASE`, database password)
-3. ✅ Update `CORS_ALLOW_ORIGIN` for production
-4. ✅ Set up proper file upload directories
-5. ✅ Configure email settings if needed
+1. Use a strong password for the admin account
+2. Replace the example values in `.env` (`APP_SECRET`, `JWT_PASSPHRASE`, database password)
+3. Update `CORS_ALLOW_ORIGIN` for production
+4. Configure email settings if needed
 
-## 🎯 Development Workflow
+## Development Workflow
 
 ```bash
 # Start backend (Terminal 1)
@@ -177,7 +176,7 @@ cd frontend && yarn dev
 cd backend && php bin/phpunit
 ```
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [Symfony Documentation](https://symfony.com/doc/current/index.html)
 - [Vue 3 Documentation](https://vuejs.org/)

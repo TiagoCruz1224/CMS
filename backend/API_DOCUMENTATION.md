@@ -1,55 +1,51 @@
 # CMS Backend API Documentation
 
-## 🎯 Overview
+## Overview
 
-A complete, production-ready CMS backend built with Symfony 6.4, featuring:
+REST API of the CMS, built with Symfony 6.4. It provides:
 
-- ✅ **JWT Authentication** - Secure token-based auth
-- ✅ **Block-based Content System** - Flexible content blocks (text, image, video, gallery, code, quote, html)
-- ✅ **SEO Optimized** - Meta tags, Open Graph, indexing control
-- ✅ **Version Control** - Page revision history with rollback capability
-- ✅ **Scheduled Publishing** - Publish/unpublish dates
-- ✅ **Role-based Access** - User roles (ROLE_USER, ROLE_ADMIN)
-- ✅ **Categories & Templates** - Organize and style pages
-- ✅ **Media Management** - Attach media to blocks
-- ✅ **Pagination** - Efficient data loading
+- JWT authentication, registration and profile endpoints, with two roles (`ROLE_USER`, `ROLE_ADMIN`)
+- Pages with SEO metadata, a publishing workflow and revision history
+- Ordered content blocks per page (text, image, video, gallery, code, quote, html)
+- Media metadata attached to blocks (the API stores URLs and metadata; it does not accept file uploads)
+- Categories (admin-only writes)
+- Pagination for page lists
 
-## 🏗️ Architecture
+## Architecture
 
 ### Entities
-- **User** - Authentication & authorization
-- **Page** - Main content pages with SEO fields
-- **PageRevision** - Version history for pages
-- **Block** - Content blocks (text, image, video, etc.)
-- **Media** - Files attached to blocks
+- **User** - Authentication and roles
+- **Page** - Content pages with SEO fields
+- **PageRevision** - Revision history for pages
+- **Block** - Ordered content blocks of a page
+- **Media** - Media metadata attached to a block
 - **Category** - Page categorization
 
-### Key Features Added (Improvements)
+### Page Fields
 
-#### 1. **SEO Fields** ✨
+#### SEO
 - `metaTitle` - Custom meta title
 - `metaDescription` - Meta description (max 500 chars)
 - `metaKeywords` - Array of keywords
 - `ogTags` - Open Graph tags for social sharing
-- `isIndexable` - Control search engine indexing
+- `isIndexable` - Search engine indexing flag
 
-#### 2. **Publishing Workflow** 📅
+#### Publishing Workflow
 - `status` - draft, published, archived, scheduled
-- `publishAt` - Schedule future publication
-- `unpublishAt` - Auto-unpublish after date
-- `isPublished()` - Smart method checks all conditions
+- `publishAt` - Optional start of the publication window
+- `unpublishAt` - Optional end of the publication window
+- `Page::isPublished()` applies these rules; see [List Public Pages](#list-public-pages)
 
-#### 3. **Page Templates** 🎨
-- `template` - page, post, landing, custom
-- Allows different frontend rendering
+#### Templates
+- `template` - page, post, landing, custom (stored with the page; the dashboard does not render pages)
 
-#### 4. **Version Control** 📜
-- `PageRevision` entity stores history
-- Automatic revision on create/update
-- Optional `changeNote` to document changes
-- Stores blocks as JSON snapshot
+#### Revisions
+- A `PageRevision` is stored on every create and update
+- Optional `changeNote` on update
+- Stores the title, content and a JSON snapshot of the blocks
+- Revisions can be read through the API; there is no restore endpoint
 
-## 📡 API Endpoints
+## API Endpoints
 
 ### Authentication
 
@@ -312,7 +308,7 @@ Authorization: Bearer {token}
 
 ---
 
-## 🔐 Security & Access Control
+## Security & Access Control
 
 ### Public Endpoints
 - `GET /api/pages` - List pages (anonymous callers only get public content)
@@ -324,7 +320,7 @@ Authorization: Bearer {token}
 Sending a JWT to the public page endpoints also returns the caller's own drafts (all pages for admins).
 
 ### Authenticated Endpoints
-- All `POST`, `PUT`, `DELETE` operations require JWT token
+- Every other endpoint requires a JWT (`Authorization: Bearer {token}`)
 - Users can only edit/delete their own pages
 - `ROLE_ADMIN` can edit/delete any content
 
@@ -336,76 +332,14 @@ Sending a JWT to the public page endpoints also returns the caller's own drafts 
 
 ---
 
-## 🚀 Improvements Made
+## Database Schema
 
-### From Basic to Production-Ready:
-
-1. **SEO Complete** ✅
-   - Meta title, description, keywords
-   - Open Graph tags
-   - Indexing control
-   
-2. **Version Control** ✅
-   - Automatic revision creation
-   - Change notes
-   - Revision history API
-   
-3. **Smart Publishing** ✅
-   - Scheduled publishing
-   - Auto-unpublish
-   - `isPublished()` method
-   
-4. **Flexible Templates** ✅
-   - Multiple page types
-   - Custom templates support
-   
-5. **Better Structure** ✅
-   - Service layer handles business logic
-   - Repositories for queries
-   - Controllers thin and focused
-
----
-
-## 📊 Database Schema
-
+```mermaid
+erDiagram
+    USER ||--o{ PAGE : authors
+    CATEGORY |o--o{ PAGE : groups
+    PAGE ||--o{ BLOCK : contains
+    BLOCK ||--o{ MEDIA : holds
+    PAGE ||--o{ PAGE_REVISION : "has revisions"
+    USER ||--o{ PAGE_REVISION : creates
 ```
-User (1) ----< (N) Page (1) ----< (N) Block (1) ----< (N) Media
-                    |
-                    └----< (N) PageRevision
-Category (1) ----< (N) Page
-```
-
----
-
-## 🧪 Testing Ready
-
-The structure is ready for PHPUnit tests:
-- Services are testable (dependency injection)
-- Repositories have custom methods
-- Validation is in place
-- Proper error handling
-
----
-
-## 📝 Next Steps for Production
-
-1. **File Upload** - Implement actual file upload handling
-2. **Image Processing** - Thumbnails, optimization
-3. **Caching** - Redis/Memcached for performance
-4. **Rate Limiting** - Prevent abuse
-5. **Search** - Full-text search with Elasticsearch
-6. **Webhooks** - Notify external services on changes
-7. **Audit Log** - Track all changes
-8. **Permissions** - Fine-grained permissions system
-
----
-
-## 🎯 Why These Improvements?
-
-**SEO** - Essential for any CMS that powers public websites
-**Revisions** - Critical for content management (rollback mistakes)
-**Scheduled Publishing** - Required for content planning
-**Templates** - Allows flexible frontend rendering
-**Better Architecture** - Maintainable, scalable, testable
-
-This is now a **production-grade CMS backend** ready to power real websites! 🚀
