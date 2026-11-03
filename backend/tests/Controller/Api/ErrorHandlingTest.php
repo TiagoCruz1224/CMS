@@ -71,10 +71,10 @@ class ErrorHandlingTest extends WebTestCase
         $this->createUser('taken@example.com');
         $user = $this->createUser('user@example.com');
 
-        $response = $this->send('PATCH', '/api/profile', $user, json_encode(['email' => 'taken@example.com', 'currentPassword' => self::PASSWORD]));
+        $response = $this->send('PATCH', '/api/profile', $user, json_encode(['email' => 'taken@example.com', 'currentPassword' => self::PASSWORD], JSON_THROW_ON_ERROR));
 
         self::assertResponseStatusCodeSame(409);
-        self::assertStringNotContainsString('SQLSTATE', json_encode($response));
+        self::assertStringNotContainsString('SQLSTATE', json_encode($response, JSON_THROW_ON_ERROR));
         self::assertNotNull($this->reloadUser('user@example.com'));
     }
 
@@ -82,7 +82,7 @@ class ErrorHandlingTest extends WebTestCase
     {
         $this->createUser('taken@example.com');
 
-        $this->send('POST', '/api/register', null, json_encode(['email' => 'taken@example.com', 'password' => self::PASSWORD]));
+        $this->send('POST', '/api/register', null, json_encode(['email' => 'taken@example.com', 'password' => self::PASSWORD], JSON_THROW_ON_ERROR));
 
         self::assertResponseStatusCodeSame(409);
     }
@@ -90,12 +90,14 @@ class ErrorHandlingTest extends WebTestCase
     public function testInternalErrorsAreNotExposedButLogged(): void
     {
         $author = $this->createUser('author@example.com');
-        $page = json_encode(['title' => 'Page', 'slug' => 'same-slug']);
+        $page = json_encode(['title' => 'Page', 'slug' => 'same-slug'], JSON_THROW_ON_ERROR);
         $this->send('POST', '/api/pages', $author, $page);
         self::assertResponseStatusCodeSame(201);
 
-        $log = static::getContainer()->getParameter('kernel.logs_dir').'/test.log';
-        $logSize = is_file($log) ? filesize($log) : 0;
+        $logDir = static::getContainer()->getParameter('kernel.logs_dir');
+        self::assertIsString($logDir);
+        $log = $logDir.'/test.log';
+        $logSize = is_file($log) ? (int) filesize($log) : 0;
 
         // The second page breaks the database unique constraint on slug
         $response = $this->send('POST', '/api/pages', $author, $page);
@@ -200,7 +202,7 @@ class ErrorHandlingTest extends WebTestCase
         foreach ($cases as [$method, $uri, $body]) {
             $as = $uri === '/api/register' ? null : $admin;
             $response = $this->send($method, $uri, $as, json_encode($body, JSON_THROW_ON_ERROR));
-            $label = "$method $uri ".json_encode($body);
+            $label = "$method $uri ".json_encode($body, JSON_THROW_ON_ERROR);
             self::assertSame(400, $this->client->getResponse()->getStatusCode(), $label);
             self::assertArrayHasKey('error', $response, $label);
         }
@@ -247,9 +249,22 @@ class ErrorHandlingTest extends WebTestCase
         }
     }
 
+    /**
+     * @template T of object
+     * @param class-string<T> $id
+     * @return T
+     */
+    private function service(string $id): object
+    {
+        $service = static::getContainer()->get($id);
+        self::assertInstanceOf($id, $service);
+
+        return $service;
+    }
+
     private function em(): EntityManagerInterface
     {
-        return static::getContainer()->get(EntityManagerInterface::class);
+        return $this->service(EntityManagerInterface::class);
     }
 
     /**
@@ -259,12 +274,12 @@ class ErrorHandlingTest extends WebTestCase
     {
         $server = ['CONTENT_TYPE' => 'application/json'];
         if ($as) {
-            $server['HTTP_AUTHORIZATION'] = 'Bearer '.static::getContainer()->get(JWTTokenManagerInterface::class)->create($as);
+            $server['HTTP_AUTHORIZATION'] = 'Bearer '.$this->service(JWTTokenManagerInterface::class)->create($as);
         }
 
         $this->client->request($method, $uri, server: $server, content: $body);
 
-        return json_decode($this->client->getResponse()->getContent(), true) ?? [];
+        return json_decode((string) $this->client->getResponse()->getContent(), true) ?? [];
     }
 
     /**
@@ -273,7 +288,7 @@ class ErrorHandlingTest extends WebTestCase
     private function createUser(string $email, array $roles = []): User
     {
         $user = (new User())->setEmail($email)->setRoles($roles);
-        $user->setPassword(static::getContainer()->get(UserPasswordHasherInterface::class)->hashPassword($user, self::PASSWORD));
+        $user->setPassword($this->service(UserPasswordHasherInterface::class)->hashPassword($user, self::PASSWORD));
 
         $this->em()->persist($user);
         $this->em()->flush();

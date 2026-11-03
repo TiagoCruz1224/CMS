@@ -18,7 +18,10 @@ if (!is_file($jwtDir.'/private.pem')) {
     touch($jwtDir.'/openssl.cnf');
     $options = ['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA, 'config' => $jwtDir.'/openssl.cnf'];
     $key = openssl_pkey_new($options);
-    openssl_pkey_export($key, $privateKey, null, $options);
+    $details = $key === false ? false : openssl_pkey_get_details($key);
+    if ($key === false || $details === false || !openssl_pkey_export($key, $privateKey, null, $options)) {
+        throw new \RuntimeException('Could not generate the JWT test key pair: '.openssl_error_string());
+    }
     file_put_contents($jwtDir.'/private.pem', $privateKey);
-    file_put_contents($jwtDir.'/public.pem', openssl_pkey_get_details($key)['key']);
+    file_put_contents($jwtDir.'/public.pem', $details['key']);
 }
