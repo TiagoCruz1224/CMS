@@ -151,6 +151,65 @@ class ErrorHandlingTest extends WebTestCase
         self::assertResponseIsSuccessful();
     }
 
+    public function testFieldsWithTheWrongTypeAnswer400(): void
+    {
+        $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
+        [$page, $block, $media, $category] = $this->createContent($admin);
+        $p = '/api/pages/'.$page->getId();
+        $b = '/api/blocks/'.$block->getId();
+        $m = '/api/media/'.$media->getId();
+        $c = '/api/categories/'.$category->getId();
+        $credentials = ['currentPassword' => self::PASSWORD];
+
+        $cases = [
+            ['POST', '/api/register', ['email' => ['x'], 'password' => self::PASSWORD]],
+            ['POST', '/api/register', ['email' => 'new@example.com', 'password' => 123]],
+            ['POST', '/api/register', ['email' => 'new@example.com', 'password' => self::PASSWORD, 'firstName' => ['x']]],
+            ['PATCH', '/api/profile', ['firstName' => ['x']]],
+            ['PATCH', '/api/profile', ['lastName' => 5]],
+            ['PATCH', '/api/profile', ['email' => ['x']] + $credentials],
+            ['PATCH', '/api/profile', ['password' => 123] + $credentials],
+            ['POST', '/api/pages', ['title' => -1]],
+            ['POST', '/api/pages', ['title' => ['x']]],
+            ['POST', '/api/pages', ['title' => 'T', 'slug' => 5]],
+            ['POST', '/api/pages', ['title' => 'T', 'content' => ['x']]],
+            ['POST', '/api/pages', ['title' => 'T', 'categoryId' => 'abc']],
+            ['PUT', $p, ['title' => ['x']]],
+            ['PUT', $p, ['metaKeywords' => 'a,b']],
+            ['PUT', $p, ['ogTags' => 'x']],
+            ['PUT', $p, ['template' => 1]],
+            ['PUT', $p, ['publishAt' => 123]],
+            ['PUT', $p, ['publishAt' => 'not a date']],
+            ['PUT', $p, ['unpublishAt' => ['x']]],
+            ['PUT', $p, ['isIndexable' => 'yes']],
+            ['PUT', $p, ['changeNote' => ['x']]],
+            ['PUT', $p, ['category' => 5]],
+            ['POST', '/api/blocks', ['type' => 1, 'pageId' => $page->getId()]],
+            ['POST', '/api/blocks', ['type' => 'text', 'pageId' => 'abc']],
+            ['POST', '/api/blocks', ['type' => 'text', 'pageId' => $page->getId(), 'settings' => 'x']],
+            ['PUT', $b, ['position' => 'first']],
+            ['PUT', $b, ['content' => ['x']]],
+            ['POST', '/api/media', ['filename' => 1, 'type' => 'image', 'url' => '/a.png', 'blockId' => $block->getId()]],
+            ['POST', '/api/media', ['filename' => 'a.png', 'type' => 'image', 'url' => '/a.png', 'blockId' => 'abc']],
+            ['PUT', $m, ['size' => 'big']],
+            ['PUT', $m, ['alt' => ['x']]],
+            ['POST', '/api/categories', ['name' => ['x'], 'slug' => 'x']],
+            ['PUT', $c, ['slug' => 1]],
+            ['PUT', $c, ['description' => ['x']]],
+        ];
+        foreach ($cases as [$method, $uri, $body]) {
+            $as = $uri === '/api/register' ? null : $admin;
+            $response = $this->send($method, $uri, $as, json_encode($body, JSON_THROW_ON_ERROR));
+            $label = "$method $uri ".json_encode($body);
+            self::assertSame(400, $this->client->getResponse()->getStatusCode(), $label);
+            self::assertArrayHasKey('error', $response, $label);
+        }
+
+        // Numeric strings are still accepted for ids, as forms often send them
+        $this->send('POST', '/api/blocks', $admin, json_encode(['type' => 'text', 'pageId' => (string) $page->getId()], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(201);
+    }
+
     private function em(): EntityManagerInterface
     {
         return static::getContainer()->get(EntityManagerInterface::class);
