@@ -114,9 +114,12 @@ class PageController extends AbstractController
 
         if (isset($data['categoryId'])) {
             $category = $this->categoryRepository->find($data['categoryId']);
-            if ($category) {
-                $pageData['category'] = $category;
+            if (!$category) {
+                return $this->json([
+                    'error' => 'Category not found'
+                ], Response::HTTP_BAD_REQUEST);
             }
+            $pageData['category'] = $category;
         }
 
         $page = $this->pageService->createPage($data['title'], $user, $pageData);
@@ -164,9 +167,12 @@ class PageController extends AbstractController
 
         if (isset($data['categoryId'])) {
             $category = $this->categoryRepository->find($data['categoryId']);
-            if ($category) {
-                $data['category'] = $category;
+            if (!$category) {
+                return $this->json([
+                    'error' => 'Category not found'
+                ], Response::HTTP_BAD_REQUEST);
             }
+            $data['category'] = $category;
             unset($data['categoryId']);
         }
 

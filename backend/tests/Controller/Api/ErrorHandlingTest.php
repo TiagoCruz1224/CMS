@@ -210,6 +210,25 @@ class ErrorHandlingTest extends WebTestCase
         self::assertResponseStatusCodeSame(201);
     }
 
+    public function testUnknownCategoryIsRejected(): void
+    {
+        $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
+        [$page, , , $category] = $this->createContent($admin);
+
+        $response = $this->send('POST', '/api/pages', $admin, json_encode(['title' => 'A', 'slug' => 'a', 'categoryId' => 999999], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(400);
+        self::assertSame(['error' => 'Category not found'], $response);
+
+        $response = $this->send('PUT', '/api/pages/'.$page->getId(), $admin, json_encode(['categoryId' => 999999], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(400);
+        self::assertSame(['error' => 'Category not found'], $response);
+
+        // An existing category is still assigned
+        $created = $this->send('POST', '/api/pages', $admin, json_encode(['title' => 'B', 'slug' => 'b', 'categoryId' => $category->getId()], JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(201);
+        self::assertSame($category->getId(), $created['category']['id'] ?? null);
+    }
+
     private function em(): EntityManagerInterface
     {
         return static::getContainer()->get(EntityManagerInterface::class);
