@@ -59,7 +59,7 @@ The one exception is the JWT layer: a missing, invalid or expired token answers
 - `401` - missing or invalid JWT (format above); `403` - not allowed (`{"error": "Forbidden"}` or a specific message)
 - `404` - not found, not visible to the caller, a malformed id (ids are 1 to 18 digits) or an unknown route
 - `405` - method not allowed for the route (`Allow` header lists the valid ones)
-- `409` - the email is already used by another account (registration or profile update)
+- `409` - a unique value is already taken: the email of another account (registration or profile update) or the slug of another page or category (`{"errors": {"slug": "This slug is already used"}}`)
 - `500` - unexpected server error; the body is always `{"error": "Internal server error"}` and the details are only logged
 
 `GET /api/pages` clamps paging to `page >= 1` and `1 <= limit <= 100`.
