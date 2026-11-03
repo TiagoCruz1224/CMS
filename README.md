@@ -41,9 +41,9 @@ A modern, full-stack CMS built with **Symfony 6.4** (Backend) and **Vue 3** (Fro
 
 ## 📋 Prerequisites
 
-- PHP 8.2 or higher
+- PHP 8.2 or higher with the `sodium` and `pdo_mysql` extensions (plus `pdo_sqlite` to run the tests)
 - Composer
-- MySQL 8.0
+- MySQL 8.0 (a local server, or Docker with the bundled `backend/compose.yaml`)
 - Node.js 18+ and Yarn
 - Symfony CLI (optional but recommended)
 
@@ -61,24 +61,24 @@ cd CMS
 ```bash
 cd backend
 
-# Install dependencies
+# Configure environment (before composer install: its post-install scripts boot Symfony)
+cp .env.example .env
+# Edit DATABASE_URL, APP_SECRET and JWT_PASSPHRASE in .env (or override them in .env.local)
+
+# Install dependencies (versions pinned by composer.lock)
 composer install
 
-# Configure environment
-cp .env .env.local
-# Edit .env.local with your database credentials
+# Optional: start MySQL 8.0 with Docker (its defaults match .env.example)
+docker compose up -d database
 
 # Generate JWT keys
 php bin/console lexik:jwt:generate-keypair
 
 # Create database
-php bin/console doctrine:database:create
+php bin/console doctrine:database:create --if-not-exists
 
 # Run migrations
-php bin/console doctrine:migrations:migrate
-
-# Create admin user (via test script or manually)
-php bin/console app:create-admin admin@cms.com admin123
+php bin/console doctrine:migrations:migrate --no-interaction
 
 # Start Symfony server
 symfony server:start --no-tls
@@ -86,7 +86,22 @@ symfony server:start --no-tls
 php -S localhost:8000 -t public/
 ```
 
-### 3. Frontend Setup
+### 3. Create an Admin User
+
+Registration always creates a regular user (`ROLE_USER`); roles sent to the API are ignored.
+Register through the API, then promote the account from the console (in `backend/`, with the server running):
+
+```bash
+curl -X POST http://localhost:8000/api/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@example.com", "password": "<choose-a-password>", "firstName": "Admin", "lastName": "User"}'
+
+php bin/console dbal:run-sql "UPDATE user SET roles = '[\"ROLE_ADMIN\"]' WHERE email = 'admin@example.com'"
+```
+
+### 4. Frontend Setup
+
+From the repository root:
 
 ```bash
 cd frontend
@@ -100,8 +115,7 @@ yarn dev
 
 ## 🔑 Default Credentials
 
-- **Email**: `admin@cms.com`
-- **Password**: `admin123`
+There are no default credentials. Sign in with the admin account created in step 3.
 
 ## 📁 Project Structure
 
@@ -166,9 +180,12 @@ CMS/
 ```bash
 cd backend
 php bin/phpunit
-# or use the test script
-./test-api.sh
 ```
+
+The functional tests use a throwaway SQLite database (`backend/.env.test`), so they need no MySQL server.
+
+`backend/test-api.sh` is an end-to-end smoke test for a running server: it registers its own users, promotes
+the admin with `bin/console`, and exits with a non-zero status if any check fails.
 
 ## 🌐 Production Deployment
 

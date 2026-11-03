@@ -30,9 +30,6 @@ backend/assets/vendor/
 backend/config/jwt/*.pem
 ###< lexik/jwt-authentication-bundle ###
 
-# Composer
-backend/composer.lock
-
 # ====================================
 # Frontend (Vue 3 + Vite)
 # ====================================

@@ -7,13 +7,16 @@
 # Check PHP version (need 8.2+)
 php -v
 
+# Check PHP extensions (need sodium and pdo_mysql; pdo_sqlite for the tests)
+php -m | grep -E "sodium|pdo_mysql|pdo_sqlite"
+
 # Check Composer
 composer --version
 
 # Check Node.js (need 18+)
 node -v
 
-# Check MySQL
+# Check MySQL 8.0 (or Docker, to use backend/compose.yaml instead)
 mysql --version
 ```
 
@@ -28,43 +31,53 @@ cd CMS
 ```bash
 cd backend
 
-# Install PHP dependencies
+# Copy environment file (before composer install: its post-install scripts boot Symfony)
+cp .env.example .env
+
+# Edit DATABASE_URL, APP_SECRET and JWT_PASSPHRASE in .env (or override them in .env.local)
+nano .env
+# e.g. DATABASE_URL="mysql://your_user:your_password@127.0.0.1:3306/cms_db?serverVersion=8.0&charset=utf8mb4"
+
+# Install PHP dependencies (versions pinned by composer.lock)
 composer install
 
-# Copy environment file
-cp .env.example .env.local
-
-# Edit database credentials in .env.local
-nano .env.local
-# Set: DATABASE_URL="mysql://your_user:your_password@127.0.0.1:3306/cms_db?serverVersion=8.0"
+# Optional: start MySQL 8.0 with Docker (its defaults match .env.example)
+docker compose up -d database
 
 # Generate JWT keys
 php bin/console lexik:jwt:generate-keypair
 
 # Create database
-php bin/console doctrine:database:create
+php bin/console doctrine:database:create --if-not-exists
 
 # Run migrations
-php bin/console doctrine:migrations:migrate
-
-# Register admin user
-curl -X POST http://localhost:8000/api/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "admin@cms.com",
-    "password": "admin123",
-    "firstName": "Admin",
-    "lastName": "User",
-    "roles": ["ROLE_ADMIN"]
-  }'
+php bin/console doctrine:migrations:migrate --no-interaction
 
 # Start Symfony server (without TLS for development)
 symfony server:start --no-tls
 ```
 
-### 4. Frontend Setup
+### 4. Create an Admin User
 
-Open a new terminal:
+Registration always creates a regular user (`ROLE_USER`); roles sent to the API are ignored.
+With the server running, register through the API and then promote the account (in `backend/`):
+
+```bash
+curl -X POST http://localhost:8000/api/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@example.com",
+    "password": "<choose-a-password>",
+    "firstName": "Admin",
+    "lastName": "User"
+  }'
+
+php bin/console dbal:run-sql "UPDATE user SET roles = '[\"ROLE_ADMIN\"]' WHERE email = 'admin@example.com'"
+```
+
+### 5. Frontend Setup
+
+Open a new terminal in the repository root:
 
 ```bash
 cd frontend
@@ -76,15 +89,23 @@ yarn install
 yarn dev
 ```
 
-### 5. Access the Application
+### 6. Access the Application
 
 - **Frontend**: http://localhost:5173
 - **Backend API**: http://localhost:8000/api
-- **Login**: admin@cms.com / admin123
+- **Login**: the admin account from step 4 (there are no default credentials)
 
 ## 🧪 Testing the API
 
-Run the backend test suite:
+Run the backend test suite (functional tests on a throwaway SQLite database, no MySQL needed):
+
+```bash
+cd backend
+php bin/phpunit
+```
+
+Smoke-test a running server end to end (registers its own users, promotes the admin with `bin/console`,
+exits non-zero on failure):
 
 ```bash
 cd backend
@@ -100,10 +121,17 @@ cd backend
 php bin/console lexik:jwt:generate-keypair
 ```
 
+### Issue: JWT Key Generation Fails on Windows (`error:80000003`)
+**Solution:** PHP for Windows ships without a default OpenSSL config. Point `OPENSSL_CONF` at the one bundled with PHP:
+```powershell
+$env:OPENSSL_CONF = "C:\path\to\php\extras\ssl\openssl.cnf"
+php bin/console lexik:jwt:generate-keypair
+```
+
 ### Issue: Database Connection Failed
 **Solution:**
-1. Check MySQL is running: `sudo systemctl status mysql`
-2. Verify credentials in `.env.local`
+1. Check MySQL is running: `sudo systemctl status mysql` (or `docker compose ps` in `backend/`)
+2. Verify `DATABASE_URL` in `.env` (or `.env.local`)
 3. Ensure database exists: `php bin/console doctrine:database:create`
 
 ### Issue: Port Already in Use
@@ -130,8 +158,8 @@ lsof -ti:8000 | xargs kill -9
 
 ## 📝 Next Steps
 
-1. ✅ Change default admin password
-2. ✅ Configure your `.env.local` properly
+1. ✅ Use a strong password for the admin account
+2. ✅ Replace the example values in `.env` (`APP_SECRET`, `JWT_PASSPHRASE`, database password)
 3. ✅ Update `CORS_ALLOW_ORIGIN` for production
 4. ✅ Set up proper file upload directories
 5. ✅ Configure email settings if needed
@@ -146,7 +174,7 @@ cd backend && symfony server:start --no-tls
 cd frontend && yarn dev
 
 # Run tests when needed
-cd backend && ./test-api.sh
+cd backend && php bin/phpunit
 ```
 
 ## 📚 Additional Resources
