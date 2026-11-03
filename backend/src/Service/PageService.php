@@ -195,7 +195,7 @@ class PageService
     {
         $revision = new PageRevision();
         $revision->setPage($page);
-        $revision->setTitle($page->getTitle());
+        $revision->setTitle((string) $page->getTitle());
         $revision->setContent($page->getContent());
         $revision->setCreatedBy($user);
         

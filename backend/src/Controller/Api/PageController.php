@@ -156,8 +156,7 @@ class PageController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($page->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $page)) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
@@ -211,9 +210,6 @@ class PageController extends AbstractController
     #[Route('/{id}', name: 'api_pages_delete', methods: ['DELETE'])]
     public function delete(int $id): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $page = $this->pageRepository->find($id);
 
         if (!$page) {
@@ -222,8 +218,7 @@ class PageController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($page->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $page)) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);

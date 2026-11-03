@@ -3,7 +3,6 @@
 namespace App\Controller\Api;
 
 use App\Entity\Media;
-use App\Entity\User;
 use App\Repository\BlockRepository;
 use App\Repository\MediaRepository;
 use App\Security\Voter\PageVoter;
@@ -34,7 +33,7 @@ class MediaController extends AbstractController
         // ponytail: filters in PHP after findAll(); move the rule into a query if the library grows large
         $media = array_values(array_filter(
             $this->mediaRepository->findAll(),
-            fn (Media $item) => $this->isGranted(PageVoter::VIEW, $item->getBlock()->getPage())
+            fn (Media $item) => $this->isGranted(PageVoter::VIEW, $item->getBlock()?->getPage())
         ));
 
         $json = $this->serializer->serialize($media, 'json', [
@@ -49,7 +48,7 @@ class MediaController extends AbstractController
     {
         $media = $this->mediaRepository->find($id);
 
-        if (!$media || !$this->isGranted(PageVoter::VIEW, $media->getBlock()->getPage())) {
+        if (!$media || !$this->isGranted(PageVoter::VIEW, $media->getBlock()?->getPage())) {
             return $this->json([
                 'error' => 'Media not found'
             ], Response::HTTP_NOT_FOUND);
@@ -65,9 +64,6 @@ class MediaController extends AbstractController
     #[Route('', name: 'api_media_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $data = json_decode($request->getContent(), true);
 
         if (!isset($data['filename']) || !isset($data['type']) || !isset($data['url']) || !isset($data['blockId'])) {
@@ -84,8 +80,7 @@ class MediaController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($block->getPage()->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $block->getPage())) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
@@ -133,9 +128,6 @@ class MediaController extends AbstractController
     #[Route('/{id}', name: 'api_media_update', methods: ['PUT', 'PATCH'])]
     public function update(int $id, Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $media = $this->mediaRepository->find($id);
 
         if (!$media) {
@@ -144,8 +136,7 @@ class MediaController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($media->getBlock()->getPage()->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $media->getBlock()?->getPage())) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
@@ -200,9 +191,6 @@ class MediaController extends AbstractController
     #[Route('/{id}', name: 'api_media_delete', methods: ['DELETE'])]
     public function delete(int $id): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $media = $this->mediaRepository->find($id);
 
         if (!$media) {
@@ -211,8 +199,7 @@ class MediaController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($media->getBlock()->getPage()->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $media->getBlock()?->getPage())) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);

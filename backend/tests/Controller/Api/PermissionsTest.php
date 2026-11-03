@@ -211,6 +211,40 @@ class PermissionsTest extends WebTestCase
         self::assertResponseStatusCodeSame(201);
     }
 
+    public function testOnlyTheAuthorOrAnAdminCanChangeContent(): void
+    {
+        $author = $this->createUser('author@example.com');
+        $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
+        $other = $this->createUser('other@example.com');
+        [$page, $block, $media] = $this->createPage($author, 'published');
+
+        $writes = [
+            ['PUT', '/api/pages/'.$page->getId(), ['title' => 'Changed']],
+            ['POST', '/api/blocks', ['type' => 'text', 'pageId' => $page->getId(), 'content' => 'More']],
+            ['PUT', '/api/blocks/'.$block->getId(), ['content' => 'Changed']],
+            ['POST', '/api/media', ['filename' => 'b.png', 'type' => 'image', 'url' => '/uploads/b.png', 'blockId' => $block->getId()]],
+            ['PUT', '/api/media/'.$media->getId(), ['alt' => 'Changed']],
+        ];
+        foreach ($writes as [$method, $uri, $body]) {
+            $this->request($method, $uri, $other, $body);
+            self::assertResponseStatusCodeSame(403, "other user: $method $uri");
+
+            foreach ([$author, $admin] as $user) {
+                $this->request($method, $uri, $user, $body);
+                self::assertResponseIsSuccessful("$method $uri as ".$user->getEmail());
+            }
+        }
+
+        // Deletes, innermost first; the other user is refused every time
+        foreach (['/api/media/'.$media->getId(), '/api/blocks/'.$block->getId(), '/api/pages/'.$page->getId()] as $uri) {
+            $this->request('DELETE', $uri, $other);
+            self::assertResponseStatusCodeSame(403, "other user: DELETE $uri");
+
+            $this->request('DELETE', $uri, $author);
+            self::assertResponseIsSuccessful("author: DELETE $uri");
+        }
+    }
+
     /**
      * @template T of object
      * @param class-string<T> $id

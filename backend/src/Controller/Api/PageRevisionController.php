@@ -54,7 +54,7 @@ class PageRevisionController extends AbstractController
 
         $revision = $this->revisionRepository->find($revisionId);
 
-        if (!$revision || $revision->getPage()->getId() !== $pageId) {
+        if (!$revision || $revision->getPage()?->getId() !== $pageId) {
             return $this->json([
                 'error' => 'Revision not found'
             ], Response::HTTP_NOT_FOUND);

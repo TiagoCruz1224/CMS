@@ -3,7 +3,6 @@
 namespace App\Controller\Api;
 
 use App\Entity\Block;
-use App\Entity\User;
 use App\Repository\BlockRepository;
 use App\Repository\PageRepository;
 use App\Security\Voter\PageVoter;
@@ -49,9 +48,6 @@ class BlockController extends AbstractController
     #[Route('', name: 'api_blocks_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $data = json_decode($request->getContent(), true);
 
         if (!isset($data['type']) || !isset($data['pageId'])) {
@@ -68,8 +64,7 @@ class BlockController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($page->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $page)) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
@@ -98,9 +93,6 @@ class BlockController extends AbstractController
     #[Route('/{id}', name: 'api_blocks_update', methods: ['PUT', 'PATCH'])]
     public function update(int $id, Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $block = $this->blockRepository->find($id);
 
         if (!$block) {
@@ -109,8 +101,7 @@ class BlockController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($block->getPage()->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $block->getPage())) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
@@ -141,9 +132,6 @@ class BlockController extends AbstractController
     #[Route('/{id}', name: 'api_blocks_delete', methods: ['DELETE'])]
     public function delete(int $id): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
         $block = $this->blockRepository->find($id);
 
         if (!$block) {
@@ -152,8 +140,7 @@ class BlockController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
-        // Check if user is the author or admin
-        if ($block->getPage()->getAuthor()->getId() !== $user->getId() && !in_array('ROLE_ADMIN', $user->getRoles())) {
+        if (!$this->isGranted(PageVoter::EDIT, $block->getPage())) {
             return $this->json([
                 'error' => 'Access denied'
             ], Response::HTTP_FORBIDDEN);
