@@ -91,50 +91,43 @@ class MediaController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        try {
-            $media = new Media();
-            $media->setFilename($data['filename']);
-            $media->setType($data['type']);
-            $media->setUrl($data['url']);
-            $media->setBlock($block);
+        $media = new Media();
+        $media->setFilename($data['filename']);
+        $media->setType($data['type']);
+        $media->setUrl($data['url']);
+        $media->setBlock($block);
 
-            if (isset($data['mimeType'])) {
-                $media->setMimeType($data['mimeType']);
-            }
-
-            if (isset($data['size'])) {
-                $media->setSize($data['size']);
-            }
-
-            if (isset($data['alt'])) {
-                $media->setAlt($data['alt']);
-            }
-
-            $errors = $this->validator->validate($media);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-                }
-                return $this->json([
-                    'errors' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST);
-            }
-
-            $this->entityManager->persist($media);
-            $this->entityManager->flush();
-
-            $json = $this->serializer->serialize($media, 'json', [
-                'groups' => ['media:read']
-            ]);
-
-            return new JsonResponse($json, Response::HTTP_CREATED, [], true);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to create media: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        if (isset($data['mimeType'])) {
+            $media->setMimeType($data['mimeType']);
         }
+
+        if (isset($data['size'])) {
+            $media->setSize($data['size']);
+        }
+
+        if (isset($data['alt'])) {
+            $media->setAlt($data['alt']);
+        }
+
+        $errors = $this->validator->validate($media);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
+            }
+            return $this->json([
+                'errors' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $this->entityManager->persist($media);
+        $this->entityManager->flush();
+
+        $json = $this->serializer->serialize($media, 'json', [
+            'groups' => ['media:read']
+        ]);
+
+        return new JsonResponse($json, Response::HTTP_CREATED, [], true);
     }
 
     #[Route('/{id}', name: 'api_media_update', methods: ['PUT', 'PATCH'])]
@@ -160,55 +153,48 @@ class MediaController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        try {
-            if (isset($data['filename'])) {
-                $media->setFilename($data['filename']);
-            }
-
-            if (isset($data['type'])) {
-                $media->setType($data['type']);
-            }
-
-            if (isset($data['url'])) {
-                $media->setUrl($data['url']);
-            }
-
-            if (isset($data['alt'])) {
-                $media->setAlt($data['alt']);
-            }
-
-            if (isset($data['mimeType'])) {
-                $media->setMimeType($data['mimeType']);
-            }
-
-            if (isset($data['size'])) {
-                $media->setSize($data['size']);
-            }
-
-            $errors = $this->validator->validate($media);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-                }
-                return $this->json([
-                    'errors' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST);
-            }
-
-            $this->entityManager->flush();
-
-            $json = $this->serializer->serialize($media, 'json', [
-                'groups' => ['media:read']
-            ]);
-
-            return new JsonResponse($json, Response::HTTP_OK, [], true);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to update media: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        if (isset($data['filename'])) {
+            $media->setFilename($data['filename']);
         }
+
+        if (isset($data['type'])) {
+            $media->setType($data['type']);
+        }
+
+        if (isset($data['url'])) {
+            $media->setUrl($data['url']);
+        }
+
+        if (isset($data['alt'])) {
+            $media->setAlt($data['alt']);
+        }
+
+        if (isset($data['mimeType'])) {
+            $media->setMimeType($data['mimeType']);
+        }
+
+        if (isset($data['size'])) {
+            $media->setSize($data['size']);
+        }
+
+        $errors = $this->validator->validate($media);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
+            }
+            return $this->json([
+                'errors' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $this->entityManager->flush();
+
+        $json = $this->serializer->serialize($media, 'json', [
+            'groups' => ['media:read']
+        ]);
+
+        return new JsonResponse($json, Response::HTTP_OK, [], true);
     }
 
     #[Route('/{id}', name: 'api_media_delete', methods: ['DELETE'])]
@@ -232,18 +218,11 @@ class MediaController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        try {
-            $this->entityManager->remove($media);
-            $this->entityManager->flush();
+        $this->entityManager->remove($media);
+        $this->entityManager->flush();
 
-            return $this->json([
-                'message' => 'Media deleted successfully'
-            ], Response::HTTP_OK);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to delete media: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        return $this->json([
+            'message' => 'Media deleted successfully'
+        ], Response::HTTP_OK);
     }
 }

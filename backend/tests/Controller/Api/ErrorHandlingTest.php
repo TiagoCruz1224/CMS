@@ -87,6 +87,24 @@ class ErrorHandlingTest extends WebTestCase
         self::assertResponseStatusCodeSame(409);
     }
 
+    public function testInternalErrorsAreNotExposedButLogged(): void
+    {
+        $author = $this->createUser('author@example.com');
+        $page = json_encode(['title' => 'Page', 'slug' => 'same-slug']);
+        $this->send('POST', '/api/pages', $author, $page);
+        self::assertResponseStatusCodeSame(201);
+
+        $log = static::getContainer()->getParameter('kernel.logs_dir').'/test.log';
+        $logSize = is_file($log) ? filesize($log) : 0;
+
+        // The second page breaks the database unique constraint on slug
+        $response = $this->send('POST', '/api/pages', $author, $page);
+
+        self::assertResponseStatusCodeSame(500);
+        self::assertSame(['error' => 'Internal server error'], $response);
+        self::assertStringContainsString('UNIQUE constraint failed', (string) file_get_contents($log, offset: $logSize));
+    }
+
     private function em(): EntityManagerInterface
     {
         return static::getContainer()->get(EntityManagerInterface::class);

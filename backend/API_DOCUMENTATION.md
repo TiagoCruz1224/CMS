@@ -54,6 +54,7 @@ Errors answer JSON with an `error` message, or an `errors` list for validation f
 - `400` - the body of a `POST`, `PUT` or `PATCH` request is not a JSON object, or the data is invalid
 - `401` - missing or invalid JWT; `403` - not allowed; `404` - not found or not visible to the caller
 - `409` - the email is already used by another account (registration or profile update)
+- `500` - unexpected server error; the body is always `{"error": "Internal server error"}` and the details are only logged
 
 ### Authentication
 

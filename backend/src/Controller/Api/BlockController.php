@@ -75,31 +75,24 @@ class BlockController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        try {
-            $block = $this->blockService->createBlock($data['type'], $page, $data);
+        $block = $this->blockService->createBlock($data['type'], $page, $data);
 
-            $errors = $this->validator->validate($block);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-                }
-                return $this->json([
-                    'errors' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST);
+        $errors = $this->validator->validate($block);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
             }
-
-            $json = $this->serializer->serialize($block, 'json', [
-                'groups' => ['block:read']
-            ]);
-
-            return new JsonResponse($json, Response::HTTP_CREATED, [], true);
-
-        } catch (\Exception $e) {
             return $this->json([
-                'error' => 'Failed to create block: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                'errors' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
         }
+
+        $json = $this->serializer->serialize($block, 'json', [
+            'groups' => ['block:read']
+        ]);
+
+        return new JsonResponse($json, Response::HTTP_CREATED, [], true);
     }
 
     #[Route('/{id}', name: 'api_blocks_update', methods: ['PUT', 'PATCH'])]
@@ -125,31 +118,24 @@ class BlockController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        try {
-            $this->blockService->updateBlock($block, $data);
+        $this->blockService->updateBlock($block, $data);
 
-            $errors = $this->validator->validate($block);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[$error->getPropertyPath()] = $error->getMessage();
-                }
-                return $this->json([
-                    'errors' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST);
+        $errors = $this->validator->validate($block);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
             }
-
-            $json = $this->serializer->serialize($block, 'json', [
-                'groups' => ['block:read']
-            ]);
-
-            return new JsonResponse($json, Response::HTTP_OK, [], true);
-
-        } catch (\Exception $e) {
             return $this->json([
-                'error' => 'Failed to update block: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                'errors' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
         }
+
+        $json = $this->serializer->serialize($block, 'json', [
+            'groups' => ['block:read']
+        ]);
+
+        return new JsonResponse($json, Response::HTTP_OK, [], true);
     }
 
     #[Route('/{id}', name: 'api_blocks_delete', methods: ['DELETE'])]
@@ -173,17 +159,10 @@ class BlockController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        try {
-            $this->blockService->deleteBlock($block);
+        $this->blockService->deleteBlock($block);
 
-            return $this->json([
-                'message' => 'Block deleted successfully'
-            ], Response::HTTP_OK);
-
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Failed to delete block: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        return $this->json([
+            'message' => 'Block deleted successfully'
+        ], Response::HTTP_OK);
     }
 }

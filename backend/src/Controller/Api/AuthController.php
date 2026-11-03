@@ -59,10 +59,6 @@ class AuthController extends AbstractController
 
         } catch (ValidationFailedException $e) {
             return $this->validationErrors($e);
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Registration failed: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -132,10 +128,6 @@ class AuthController extends AbstractController
 
         } catch (ValidationFailedException $e) {
             return $this->validationErrors($e);
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => 'Update failed: ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
