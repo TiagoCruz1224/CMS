@@ -1,0 +1,34 @@
+name: Backend tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.3'
+          extensions: sodium, pdo_sqlite
+          tools: composer:2.11.1
+          coverage: none
+
+      # Symfony needs a .env; the tests override it with .env.test (SQLite, generated JWT keys)
+      - run: cp .env.example .env
+
+      # Versions come from composer.lock; scripts are skipped because the tests do not need them
+      - run: composer install --no-interaction --no-progress --no-scripts
+
+      - run: php bin/phpunit

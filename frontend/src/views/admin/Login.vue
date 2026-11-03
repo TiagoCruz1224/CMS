@@ -55,11 +55,6 @@
             </span>
           </button>
         </form>
-
-        <div class="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-          <p>Default credentials:</p>
-          <p class="font-mono mt-1">admin@cms.com / admin123</p>
-        </div>
       </div>
     </div>
   </div>

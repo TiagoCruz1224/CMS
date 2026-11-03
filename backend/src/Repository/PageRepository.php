@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\Page;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -31,13 +32,11 @@ class PageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find published pages
+     * Find pages that are public right now (same rule as Page::isPublished())
      */
     public function findPublished(): array
     {
-        return $this->createQueryBuilder('p')
-            ->andWhere('p.status = :status')
-            ->setParameter('status', 'published')
+        return $this->visibleTo(false, null)
             ->orderBy('p.createdAt', 'DESC')
             ->getQuery()
             ->getResult();
@@ -52,11 +51,12 @@ class PageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Find pages with pagination
+     * Find pages with pagination. Unless $includeDrafts is set, only published
+     * pages and pages written by $author are returned.
      */
-    public function findPaginated(int $page = 1, int $limit = 10): array
+    public function findPaginated(int $page = 1, int $limit = 10, bool $includeDrafts = false, ?User $author = null): array
     {
-        $query = $this->createQueryBuilder('p')
+        $query = $this->visibleTo($includeDrafts, $author)
             ->orderBy('p.createdAt', 'DESC')
             ->setFirstResult(($page - 1) * $limit)
             ->setMaxResults($limit)
@@ -66,14 +66,35 @@ class PageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Count total pages
+     * Count the pages findPaginated() can return
      */
-    public function countAll(): int
+    public function countAll(bool $includeDrafts = false, ?User $author = null): int
     {
-        return $this->createQueryBuilder('p')
+        return $this->visibleTo($includeDrafts, $author)
             ->select('COUNT(p.id)')
             ->getQuery()
             ->getSingleScalarResult();
+    }
+
+    private function visibleTo(bool $includeDrafts, ?User $author): QueryBuilder
+    {
+        $qb = $this->createQueryBuilder('p');
+
+        if ($includeDrafts) {
+            return $qb;
+        }
+
+        // Same rule as Page::isPublished()
+        $published = "p.status IN ('published', 'scheduled')"
+            . ' AND (p.publishAt IS NULL OR p.publishAt <= :now)'
+            . ' AND (p.unpublishAt IS NULL OR p.unpublishAt >= :now)';
+        $qb->setParameter('now', new \DateTimeImmutable());
+
+        if ($author) {
+            return $qb->andWhere("($published) OR p.author = :author")->setParameter('author', $author);
+        }
+
+        return $qb->andWhere($published);
     }
 
     /**

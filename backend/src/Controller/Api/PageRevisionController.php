@@ -4,6 +4,7 @@ namespace App\Controller\Api;
 
 use App\Repository\PageRepository;
 use App\Repository\PageRevisionRepository;
+use App\Security\Voter\PageVoter;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -25,7 +26,7 @@ class PageRevisionController extends AbstractController
     {
         $page = $this->pageRepository->find($id);
 
-        if (!$page) {
+        if (!$page || !$this->isGranted(PageVoter::EDIT, $page)) {
             return $this->json([
                 'error' => 'Page not found'
             ], Response::HTTP_NOT_FOUND);
@@ -45,7 +46,7 @@ class PageRevisionController extends AbstractController
     {
         $page = $this->pageRepository->find($pageId);
 
-        if (!$page) {
+        if (!$page || !$this->isGranted(PageVoter::EDIT, $page)) {
             return $this->json([
                 'error' => 'Page not found'
             ], Response::HTTP_NOT_FOUND);

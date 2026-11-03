@@ -1,11 +1,22 @@
 #!/bin/bash
 
-# CMS Backend API Test Script
-# This script tests all major endpoints
+# CMS Backend API smoke test
+# Runs against a live server (BASE_URL) and promotes its admin with bin/console,
+# so run it from a machine that can reach the same database as the server.
+# Usage: ./test-api.sh   (optional: BASE_URL=http://localhost:8001/api PHP="php -d extension=sodium")
 
-BASE_URL="http://localhost:8000/api"
+cd "$(dirname "$0")" || exit 1
+
+BASE_URL="${BASE_URL:-http://localhost:8000/api}"
+PHP="${PHP:-php}"
+# Unique accounts and slugs per run, so the script can be re-run on the same database
+RUN_ID=$(date +%s)
+ADMIN_EMAIL="admin-$RUN_ID@example.com"
+USER_EMAIL="user-$RUN_ID@example.com"
+TEST_PASSWORD="ChangeMe-$RUN_ID"
 ADMIN_TOKEN=""
 USER_TOKEN=""
+FAILED=0
 
 echo "🚀 CMS Backend API Test Suite"
 echo "=============================="
@@ -16,33 +27,46 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Test 1: Register Admin User
+fail() {
+    echo -e "${RED}✗ $1${NC}"
+    FAILED=$((FAILED + 1))
+}
+
+# Test 1: Register Admin User (registration always creates ROLE_USER accounts)
 echo "📝 Test 1: Register Admin User"
 ADMIN_RESPONSE=$(curl -s -X POST "$BASE_URL/register" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "admin@cms.com",
-    "password": "admin123",
+    "email": "'"$ADMIN_EMAIL"'",
+    "password": "'"$TEST_PASSWORD"'",
     "firstName": "Admin",
-    "lastName": "User",
-    "roles": ["ROLE_ADMIN"]
+    "lastName": "User"
   }')
 
 if echo "$ADMIN_RESPONSE" | grep -q "User registered successfully"; then
     echo -e "${GREEN}✓ Admin user registered${NC}"
 else
-    echo -e "${RED}✗ Failed to register admin${NC}"
+    fail "Failed to register admin"
     echo "$ADMIN_RESPONSE"
 fi
 echo ""
 
-# Test 2: Register Regular User
-echo "📝 Test 2: Register Regular User"
+# Test 2: Promote Admin User (roles are never taken from API requests)
+echo "🛡️  Test 2: Promote Admin User"
+if $PHP bin/console dbal:run-sql "UPDATE user SET roles = '[\"ROLE_ADMIN\"]' WHERE email = '$ADMIN_EMAIL'" > /dev/null; then
+    echo -e "${GREEN}✓ Admin user promoted to ROLE_ADMIN${NC}"
+else
+    fail "Failed to promote admin (is the database in .env reachable?)"
+fi
+echo ""
+
+# Test 3: Register Regular User
+echo "📝 Test 3: Register Regular User"
 USER_RESPONSE=$(curl -s -X POST "$BASE_URL/register" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "user@cms.com",
-    "password": "user123",
+    "email": "'"$USER_EMAIL"'",
+    "password": "'"$TEST_PASSWORD"'",
     "firstName": "John",
     "lastName": "Doe"
   }')
@@ -50,59 +74,57 @@ USER_RESPONSE=$(curl -s -X POST "$BASE_URL/register" \
 if echo "$USER_RESPONSE" | grep -q "User registered successfully"; then
     echo -e "${GREEN}✓ Regular user registered${NC}"
 else
-    echo -e "${RED}✗ Failed to register user${NC}"
+    fail "Failed to register user"
     echo "$USER_RESPONSE"
 fi
 echo ""
 
-# Test 3: Login as Admin
-echo "🔐 Test 3: Admin Login"
+# Test 4: Login as Admin
+echo "🔐 Test 4: Admin Login"
 ADMIN_LOGIN=$(curl -s -X POST "$BASE_URL/login" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "admin@cms.com",
-    "password": "admin123"
+    "email": "'"$ADMIN_EMAIL"'",
+    "password": "'"$TEST_PASSWORD"'"
   }')
 
 ADMIN_TOKEN=$(echo "$ADMIN_LOGIN" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
 
 if [ -n "$ADMIN_TOKEN" ]; then
     echo -e "${GREEN}✓ Admin login successful${NC}"
-    echo "Token: ${ADMIN_TOKEN:0:50}..."
 else
-    echo -e "${RED}✗ Admin login failed${NC}"
+    fail "Admin login failed"
     echo "$ADMIN_LOGIN"
 fi
 echo ""
 
-# Test 4: Login as User
-echo "🔐 Test 4: User Login"
+# Test 5: Login as User
+echo "🔐 Test 5: User Login"
 USER_LOGIN=$(curl -s -X POST "$BASE_URL/login" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "user@cms.com",
-    "password": "user123"
+    "email": "'"$USER_EMAIL"'",
+    "password": "'"$TEST_PASSWORD"'"
   }')
 
 USER_TOKEN=$(echo "$USER_LOGIN" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
 
 if [ -n "$USER_TOKEN" ]; then
     echo -e "${GREEN}✓ User login successful${NC}"
-    echo "Token: ${USER_TOKEN:0:50}..."
 else
-    echo -e "${RED}✗ User login failed${NC}"
+    fail "User login failed"
     echo "$USER_LOGIN"
 fi
 echo ""
 
-# Test 5: Create Category (Admin only)
-echo "🏷️  Test 5: Create Category"
+# Test 6: Create Category (Admin only)
+echo "🏷️  Test 6: Create Category"
 CATEGORY_RESPONSE=$(curl -s -X POST "$BASE_URL/categories" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{
-    "name": "Blog Posts",
-    "slug": "blog-posts",
+    "name": "Blog Posts '"$RUN_ID"'",
+    "slug": "blog-posts-'"$RUN_ID"'",
     "description": "All blog posts go here"
   }')
 
@@ -110,30 +132,30 @@ if echo "$CATEGORY_RESPONSE" | grep -q '"id"'; then
     CATEGORY_ID=$(echo "$CATEGORY_RESPONSE" | grep -o '"id":[0-9]*' | cut -d':' -f2)
     echo -e "${GREEN}✓ Category created (ID: $CATEGORY_ID)${NC}"
 else
-    echo -e "${RED}✗ Failed to create category${NC}"
+    fail "Failed to create category"
     echo "$CATEGORY_RESPONSE"
 fi
 echo ""
 
-# Test 6: List Categories
-echo "📋 Test 6: List Categories"
+# Test 7: List Categories
+echo "📋 Test 7: List Categories"
 CATEGORIES=$(curl -s -X GET "$BASE_URL/categories")
 
-if echo "$CATEGORIES" | grep -q "Blog Posts"; then
+if echo "$CATEGORIES" | grep -q "Blog Posts $RUN_ID"; then
     echo -e "${GREEN}✓ Categories listed successfully${NC}"
 else
-    echo -e "${RED}✗ Failed to list categories${NC}"
+    fail "Failed to list categories"
 fi
 echo ""
 
-# Test 7: Create Page
-echo "📄 Test 7: Create Page"
+# Test 8: Create Page
+echo "📄 Test 8: Create Page"
 PAGE_RESPONSE=$(curl -s -X POST "$BASE_URL/pages" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $USER_TOKEN" \
   -d '{
     "title": "My First Blog Post",
-    "slug": "my-first-blog-post",
+    "slug": "my-first-blog-post-'"$RUN_ID"'",
     "content": "This is the main content of my first blog post!",
     "status": "published",
     "metaTitle": "My First Blog Post - SEO Title",
@@ -141,26 +163,26 @@ PAGE_RESPONSE=$(curl -s -X POST "$BASE_URL/pages" \
     "metaKeywords": ["blog", "cms", "symfony"],
     "ogTitle": "My First Blog Post",
     "ogDescription": "Check out my first blog post!",
-    "categoryId": '$CATEGORY_ID'
+    "categoryId": '"${CATEGORY_ID:-null}"'
   }')
 
 if echo "$PAGE_RESPONSE" | grep -q '"id"'; then
     PAGE_ID=$(echo "$PAGE_RESPONSE" | grep -o '"id":[0-9]*' | cut -d':' -f2 | head -1)
     echo -e "${GREEN}✓ Page created (ID: $PAGE_ID)${NC}"
 else
-    echo -e "${RED}✗ Failed to create page${NC}"
+    fail "Failed to create page"
     echo "$PAGE_RESPONSE"
 fi
 echo ""
 
-# Test 8: Create Text Block
-echo "📦 Test 8: Create Text Block"
+# Test 9: Create Text Block
+echo "📦 Test 9: Create Text Block"
 BLOCK_RESPONSE=$(curl -s -X POST "$BASE_URL/blocks" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $USER_TOKEN" \
   -d '{
     "type": "text",
-    "pageId": '$PAGE_ID',
+    "pageId": '"${PAGE_ID:-0}"',
     "content": "This is a text block with rich content!",
     "position": 0,
     "settings": {
@@ -173,13 +195,13 @@ if echo "$BLOCK_RESPONSE" | grep -q '"id"'; then
     BLOCK_ID=$(echo "$BLOCK_RESPONSE" | grep -o '"id":[0-9]*' | cut -d':' -f2 | head -1)
     echo -e "${GREEN}✓ Block created (ID: $BLOCK_ID)${NC}"
 else
-    echo -e "${RED}✗ Failed to create block${NC}"
+    fail "Failed to create block"
     echo "$BLOCK_RESPONSE"
 fi
 echo ""
 
-# Test 9: Create Media
-echo "🖼️  Test 9: Create Media"
+# Test 10: Create Media
+echo "🖼️  Test 10: Create Media"
 MEDIA_RESPONSE=$(curl -s -X POST "$BASE_URL/media" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $USER_TOKEN" \
@@ -187,7 +209,7 @@ MEDIA_RESPONSE=$(curl -s -X POST "$BASE_URL/media" \
     "filename": "example-image.jpg",
     "type": "image",
     "url": "https://via.placeholder.com/800x600",
-    "blockId": '$BLOCK_ID',
+    "blockId": '"${BLOCK_ID:-0}"',
     "mimeType": "image/jpeg",
     "size": 125000,
     "alt": "Example placeholder image"
@@ -197,24 +219,24 @@ if echo "$MEDIA_RESPONSE" | grep -q '"id"'; then
     MEDIA_ID=$(echo "$MEDIA_RESPONSE" | grep -o '"id":[0-9]*' | cut -d':' -f2 | head -1)
     echo -e "${GREEN}✓ Media created (ID: $MEDIA_ID)${NC}"
 else
-    echo -e "${RED}✗ Failed to create media${NC}"
+    fail "Failed to create media"
     echo "$MEDIA_RESPONSE"
 fi
 echo ""
 
-# Test 10: Get Page with Blocks
-echo "📖 Test 10: Get Page with Blocks"
+# Test 11: Get Page with Blocks
+echo "📖 Test 11: Get Page with Blocks"
 PAGE_DETAIL=$(curl -s -X GET "$BASE_URL/pages/$PAGE_ID")
 
 if echo "$PAGE_DETAIL" | grep -q "My First Blog Post"; then
     echo -e "${GREEN}✓ Page retrieved with blocks${NC}"
 else
-    echo -e "${RED}✗ Failed to get page${NC}"
+    fail "Failed to get page"
 fi
 echo ""
 
-# Test 11: Update Page
-echo "✏️  Test 11: Update Page"
+# Test 12: Update Page
+echo "✏️  Test 12: Update Page"
 UPDATE_RESPONSE=$(curl -s -X PUT "$BASE_URL/pages/$PAGE_ID" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $USER_TOKEN" \
@@ -226,12 +248,12 @@ UPDATE_RESPONSE=$(curl -s -X PUT "$BASE_URL/pages/$PAGE_ID" \
 if echo "$UPDATE_RESPONSE" | grep -q "My Updated Blog Post"; then
     echo -e "${GREEN}✓ Page updated successfully${NC}"
 else
-    echo -e "${RED}✗ Failed to update page${NC}"
+    fail "Failed to update page"
 fi
 echo ""
 
-# Test 12: List Page Revisions
-echo "📜 Test 12: List Page Revisions"
+# Test 13: List Page Revisions
+echo "📜 Test 13: List Page Revisions"
 REVISIONS=$(curl -s -X GET "$BASE_URL/pages/$PAGE_ID/revisions" \
   -H "Authorization: Bearer $USER_TOKEN")
 
@@ -239,42 +261,45 @@ if echo "$REVISIONS" | grep -q '"id"'; then
     echo -e "${GREEN}✓ Revisions retrieved${NC}"
     echo "Revision count: $(echo "$REVISIONS" | grep -o '"id":' | wc -l)"
 else
-    echo -e "${RED}✗ Failed to get revisions${NC}"
+    fail "Failed to get revisions"
 fi
 echo ""
 
-# Test 13: List Published Pages (Public)
-echo "🌍 Test 13: List Published Pages (No Auth)"
+# Test 14: List Published Pages (Public)
+echo "🌍 Test 14: List Published Pages (No Auth)"
 PUBLIC_PAGES=$(curl -s -X GET "$BASE_URL/pages?status=published")
 
 if echo "$PUBLIC_PAGES" | grep -q '"id"'; then
     echo -e "${GREEN}✓ Public pages listed${NC}"
 else
-    echo -e "${RED}✗ Failed to list public pages${NC}"
+    fail "Failed to list public pages"
 fi
 echo ""
 
-# Test 14: Get User Profile
-echo "👤 Test 14: Get User Profile"
+# Test 15: Get User Profile
+echo "👤 Test 15: Get User Profile"
 PROFILE=$(curl -s -X GET "$BASE_URL/profile" \
   -H "Authorization: Bearer $USER_TOKEN")
 
-if echo "$PROFILE" | grep -q "user@cms.com"; then
+if echo "$PROFILE" | grep -q "$USER_EMAIL"; then
     echo -e "${GREEN}✓ Profile retrieved${NC}"
 else
-    echo -e "${RED}✗ Failed to get profile${NC}"
+    fail "Failed to get profile"
 fi
 echo ""
 
 echo "=============================="
-echo "✅ Test Suite Complete!"
-echo ""
 echo "Summary:"
-echo "- Admin Token: ${ADMIN_TOKEN:0:30}..."
-echo "- User Token: ${USER_TOKEN:0:30}..."
+echo "- Admin: $ADMIN_EMAIL"
+echo "- User: $USER_EMAIL"
 echo "- Category ID: $CATEGORY_ID"
 echo "- Page ID: $PAGE_ID"
 echo "- Block ID: $BLOCK_ID"
 echo "- Media ID: $MEDIA_ID"
 echo ""
-echo "🎉 Your CMS backend is fully functional!"
+
+if [ "$FAILED" -gt 0 ]; then
+    echo -e "${RED}✗ $FAILED check(s) failed${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ All checks passed${NC}"

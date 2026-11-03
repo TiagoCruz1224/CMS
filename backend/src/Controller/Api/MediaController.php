@@ -6,6 +6,7 @@ use App\Entity\Media;
 use App\Entity\User;
 use App\Repository\BlockRepository;
 use App\Repository\MediaRepository;
+use App\Security\Voter\PageVoter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -30,7 +31,11 @@ class MediaController extends AbstractController
     #[Route('', name: 'api_media_list', methods: ['GET'])]
     public function index(): JsonResponse
     {
-        $media = $this->mediaRepository->findAll();
+        // ponytail: filters in PHP after findAll(); move the rule into a query if the library grows large
+        $media = array_values(array_filter(
+            $this->mediaRepository->findAll(),
+            fn (Media $item) => $this->isGranted(PageVoter::VIEW, $item->getBlock()->getPage())
+        ));
 
         $json = $this->serializer->serialize($media, 'json', [
             'groups' => ['media:read']
@@ -44,7 +49,7 @@ class MediaController extends AbstractController
     {
         $media = $this->mediaRepository->find($id);
 
-        if (!$media) {
+        if (!$media || !$this->isGranted(PageVoter::VIEW, $media->getBlock()->getPage())) {
             return $this->json([
                 'error' => 'Media not found'
             ], Response::HTTP_NOT_FOUND);

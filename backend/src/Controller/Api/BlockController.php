@@ -6,6 +6,7 @@ use App\Entity\Block;
 use App\Entity\User;
 use App\Repository\BlockRepository;
 use App\Repository\PageRepository;
+use App\Security\Voter\PageVoter;
 use App\Service\BlockService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -32,7 +33,7 @@ class BlockController extends AbstractController
     {
         $block = $this->blockRepository->find($id);
 
-        if (!$block) {
+        if (!$block || !$this->isGranted(PageVoter::VIEW, $block->getPage())) {
             return $this->json([
                 'error' => 'Block not found'
             ], Response::HTTP_NOT_FOUND);

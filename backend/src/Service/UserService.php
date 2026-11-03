@@ -6,20 +6,25 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Validator\Exception\ValidationFailedException;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class UserService
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
         private UserRepository $userRepository,
-        private UserPasswordHasherInterface $passwordHasher
+        private UserPasswordHasherInterface $passwordHasher,
+        private ValidatorInterface $validator
     ) {
     }
 
-    public function createUser(string $email, string $password, array $roles = []): User
+    public function createUser(string $email, string $password, array $roles = [], ?string $firstName = null, ?string $lastName = null): User
     {
         $user = new User();
         $user->setEmail($email);
+        $user->setFirstName($firstName);
+        $user->setLastName($lastName);
         
         $hashedPassword = $this->passwordHasher->hashPassword($user, $password);
         $user->setPassword($hashedPassword);
@@ -28,12 +33,16 @@ class UserService
             $user->setRoles($roles);
         }
 
+        $this->validate($user);
         $this->entityManager->persist($user);
         $this->entityManager->flush();
 
         return $user;
     }
 
+    /**
+     * Self-service profile update: roles are never taken from request data.
+     */
     public function updateUser(User $user, array $data): User
     {
         if (isset($data['email'])) {
@@ -53,10 +62,7 @@ class UserService
             $user->setPassword($hashedPassword);
         }
 
-        if (isset($data['roles'])) {
-            $user->setRoles($data['roles']);
-        }
-
+        $this->validate($user);
         $this->entityManager->flush();
 
         return $user;
@@ -71,5 +77,17 @@ class UserService
     public function findByEmail(string $email): ?User
     {
         return $this->userRepository->findOneByEmail($email);
+    }
+
+    /**
+     * Runs before flush() so invalid data is never persisted.
+     */
+    private function validate(User $user): void
+    {
+        $violations = $this->validator->validate($user);
+
+        if (count($violations) > 0) {
+            throw new ValidationFailedException($user, $violations);
+        }
     }
 }

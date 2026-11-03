@@ -8,15 +8,16 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Annotation\Route;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Symfony\Component\Validator\Exception\ValidationFailedException;
 
 #[Route('/api')]
 class AuthController extends AbstractController
 {
     public function __construct(
         private UserService $userService,
-        private ValidatorInterface $validator
+        private UserPasswordHasherInterface $passwordHasher
     ) {
     }
 
@@ -39,27 +40,13 @@ class AuthController extends AbstractController
         }
 
         try {
+            // Roles are never taken from the request: new accounts only get ROLE_USER
             $user = $this->userService->createUser(
                 $data['email'],
                 $data['password'],
-                $data['roles'] ?? []
+                firstName: $data['firstName'] ?? null,
+                lastName: $data['lastName'] ?? null
             );
-
-            // Update additional fields if provided
-            if (isset($data['firstName']) || isset($data['lastName'])) {
-                $this->userService->updateUser($user, $data);
-            }
-
-            $errors = $this->validator->validate($user);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[] = $error->getMessage();
-                }
-                return $this->json([
-                    'errors' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST);
-            }
 
             return $this->json([
                 'message' => 'User registered successfully',
@@ -69,6 +56,8 @@ class AuthController extends AbstractController
                 ]
             ], Response::HTTP_CREATED);
 
+        } catch (ValidationFailedException $e) {
+            return $this->validationErrors($e);
         } catch (\Exception $e) {
             return $this->json([
                 'error' => 'Registration failed: ' . $e->getMessage()
@@ -119,19 +108,16 @@ class AuthController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
+        $changesEmail = isset($data['email']) && $data['email'] !== $user->getEmail();
+        if (($changesEmail || isset($data['password']))
+            && !$this->passwordHasher->isPasswordValid($user, (string) ($data['currentPassword'] ?? ''))) {
+            return $this->json([
+                'error' => 'Current password is required to change email or password'
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         try {
             $this->userService->updateUser($user, $data);
-
-            $errors = $this->validator->validate($user);
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $error) {
-                    $errorMessages[] = $error->getMessage();
-                }
-                return $this->json([
-                    'errors' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST);
-            }
 
             return $this->json([
                 'message' => 'Profile updated successfully',
@@ -143,10 +129,24 @@ class AuthController extends AbstractController
                 ]
             ]);
 
+        } catch (ValidationFailedException $e) {
+            return $this->validationErrors($e);
         } catch (\Exception $e) {
             return $this->json([
                 'error' => 'Update failed: ' . $e->getMessage()
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private function validationErrors(ValidationFailedException $e): JsonResponse
+    {
+        $errorMessages = [];
+        foreach ($e->getViolations() as $violation) {
+            $errorMessages[] = $violation->getMessage();
+        }
+
+        return $this->json([
+            'errors' => $errorMessages
+        ], Response::HTTP_BAD_REQUEST);
     }
 }
