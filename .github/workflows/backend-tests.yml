@@ -31,4 +31,6 @@ jobs:
       # Versions come from composer.lock; scripts are skipped because the tests do not need them
       - run: composer install --no-interaction --no-progress --no-scripts
 
+      - run: vendor/bin/phpstan analyse --no-progress
+
       - run: php bin/phpunit
